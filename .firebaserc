@@ -1,9 +1,7 @@
 {
   "projects": {
-    "default": "articx-ai",
+    "default": "articx-ai-dev",
     "dev": "articx-ai-dev",
     "prod": "articx-ai"
-  },
-  "targets": {},
-  "etags": {}
+  }
 }
