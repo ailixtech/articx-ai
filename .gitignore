@@ -1,0 +1,11 @@
+.venv/
+node_modules/
+__pycache__/
+.DS_Store
+adapters/
+articx-v1/
+*.safetensors
+.firebase/
+firebase-debug.log
+.env
+*serviceAccount*.json
