@@ -11,8 +11,22 @@ const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
+const { createHash } = require("node:crypto");
 
 initializeApp();
+
+// Email codes, profile and password reset (callable functions).
+Object.assign(exports, require("./auth"));
+// Public share links for chats.
+Object.assign(exports, require("./share"));
+// Emails thumbs-down reports to the team.
+Object.assign(exports, require("./feedback"));
+// Waitlist sign-ups from /waitlist.
+Object.assign(exports, require("./waitlist"));
+
+// Weekly topic counts for the homepage (no message text is stored).
+const { countTopic, topics, weekOf } = require("./topics");
+exports.topics = topics;
 
 // Secrets (set with: firebase functions:secrets:set NAME)
 const MODEL_API_URL = defineSecret("MODEL_API_URL"); // e.g. https://model.example.ca/v1
@@ -22,20 +36,45 @@ const MODEL_API_KEY = defineSecret("MODEL_API_KEY"); // bearer token your model 
 const MODEL_NAME = defineString("MODEL_NAME");
 const ALLOWED_ORIGINS = defineString("ALLOWED_ORIGINS", { default: "" });
 const DAILY_MESSAGE_LIMIT = defineInt("DAILY_MESSAGE_LIMIT", { default: 200 });
+// Weekly (Monday to Sunday, UTC) and monthly caps on top of the daily one.
+// Keep all three in step with plans in web/src/config.js.
+const WEEKLY_MESSAGE_LIMIT = defineInt("WEEKLY_MESSAGE_LIMIT", { default: 1000 });
+const MONTHLY_MESSAGE_LIMIT = defineInt("MONTHLY_MESSAGE_LIMIT", { default: 3000 });
+// Guests (Firebase anonymous auth) get a few free messages before they must sign up.
+// Keep GUEST_MESSAGE_LIMIT in step with guestMessageLimit in web/js/config.js.
+const GUEST_MESSAGE_LIMIT = defineInt("GUEST_MESSAGE_LIMIT", { default: 3 });
+// Caps guest messages per IP per day, so clearing browser data doesn't reset the allowance.
+const GUEST_IP_DAILY_LIMIT = defineInt("GUEST_IP_DAILY_LIMIT", { default: 15 });
 
 const MAX_MESSAGES = 30;
-const MAX_CHARS_PER_MESSAGE = 8000;
-const MAX_TOTAL_CHARS = 48000;
+// Longest single message, pasted text included (keep in step with maxMessageChars in web/src/config.js).
+const MAX_CHARS_PER_MESSAGE = 100000;
+// How much conversation is sent to the model per request. Older turns are dropped to fit;
+// set it to what your model server's context window can hold (roughly 4 characters per token).
+const MAX_CONTEXT_CHARS = defineInt("MAX_CONTEXT_CHARS", { default: 120000 });
 
 const SYSTEM_PROMPT = [
-  "You are ARTICxAI, an AI assistant made in Canada by AILIX.",
+  "You are Maple, the AI assistant of ARTICxAI, made in Canada by AILIX.",
   "You do not have internet access, live data, or the ability to search the web.",
   "Your knowledge comes from training data that stops at a cutoff date and may be outdated.",
   "If asked about news, current events, today's date, prices, scores, weather, elections, or anything that may have changed recently, say plainly that you can't check live information and suggest a reliable current source. Never present recent events as confirmed fact.",
   "Never invent URLs, citations, quotes, statistics, or sources. If you don't know a source, say so. Only mention well-known homepages (e.g. canada.ca) when you are certain they exist.",
   "If asked what model you are built on, say you are built on an open-source base model adapted by AILIX.",
-  "Be helpful, clear and concise. Use Canadian spelling.",
+  "Be helpful, clear and concise. Reply in the language the user writes in: Canadian English (with Canadian spelling) or French.",
 ].join(" ");
+
+// Maple models offered in the app. Both run on MODEL_NAME; Maple Q1 asks for short,
+// precise answers and has a smaller reply budget. Guests can only use the default.
+// Keep ids in step with MODELS in web/src/config.js.
+const DEFAULT_MODEL = "maple-0.5";
+const MODELS = {
+  "maple-0.5": { maxTokens: 2048, style: "" },
+  "maple-q1": {
+    maxTokens: 700,
+    style: "Answer as briefly and precisely as possible: lead with the answer, use at most a few short sentences or a short list, and skip greetings, filler and repetition.",
+    accountsOnly: true,
+  },
+};
 
 function projectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
@@ -55,32 +94,58 @@ function allowedOrigins() {
 
 function cleanMessages(input) {
   if (!Array.isArray(input) || input.length === 0) return { error: "No messages were sent." };
-  const msgs = input.slice(-MAX_MESSAGES);
-  let total = 0;
-  const out = [];
-  for (const m of msgs) {
+  const msgs = [];
+  for (const m of input.slice(-MAX_MESSAGES)) {
     // Only user/assistant turns are accepted; client "system" messages are dropped.
     if (!m || (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string") continue;
-    const content = m.content.slice(0, MAX_CHARS_PER_MESSAGE);
-    total += content.length;
-    out.push({ role: m.role, content });
+    msgs.push({ role: m.role, content: m.content.slice(0, MAX_CHARS_PER_MESSAGE) });
   }
-  if (!out.length || out[out.length - 1].role !== "user") return { error: "The last message must be from the user." };
-  if (total > MAX_TOTAL_CHARS) return { error: "This conversation is too long. Start a new chat to continue." };
-  return { messages: out };
+  if (!msgs.length || msgs[msgs.length - 1].role !== "user") return { error: "The last message must be from the user." };
+  // Keep the newest turns that fit the context budget (always the latest message), starting on a user turn.
+  const budget = MAX_CONTEXT_CHARS.value();
+  let total = 0;
+  let start = msgs.length;
+  while (start > 0 && (start === msgs.length || total + msgs[start - 1].content.length <= budget)) {
+    total += msgs[--start].content.length;
+  }
+  while (start < msgs.length - 1 && msgs[start].role !== "user") start++;
+  return { messages: msgs.slice(start) };
 }
 
-async function takeQuota(uid) {
-  const day = new Date().toISOString().slice(0, 10); // UTC day
-  const ref = getFirestore().doc(`usage/${uid}_${day}`);
-  const limit = DAILY_MESSAGE_LIMIT.value();
-  return getFirestore().runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const count = snap.exists ? snap.get("count") : 0;
-    if (count >= limit) return false;
-    tx.set(ref, { uid, day, count: count + 1, updatedAt: new Date() }, { merge: true });
-    return true;
+// Atomically adds one to every counter, or to none if any is already at its limit.
+// Returns -1 on success, otherwise the index of the first counter that is full.
+async function takeQuota(counters) {
+  const db = getFirestore();
+  return db.runTransaction(async (tx) => {
+    const snaps = await Promise.all(counters.map((c) => tx.get(db.doc(c.path))));
+    const counts = snaps.map((s) => (s.exists ? s.get("count") : 0));
+    const full = counters.findIndex((c, i) => counts[i] >= c.limit);
+    if (full !== -1) return full;
+    counters.forEach((c, i) => tx.set(db.doc(c.path), { ...c.fields, count: counts[i] + 1, updatedAt: new Date() }, { merge: true }));
+    return -1;
   });
+}
+
+// An account's day, week and month counters (usage/{uid}_{day}, _w{monday}, _m{YYYY-MM}), all UTC.
+// The app reads the same documents for Settings > Usage.
+const LIMIT_ERRORS = [
+  ["day_limit", "You've reached today's message limit. Try again tomorrow."],
+  ["week_limit", "You've reached this week's message limit. It resets on Monday."],
+  ["month_limit", "You've reached this month's message limit. It resets on the 1st."],
+];
+function accountCounters(uid, now) {
+  const day = now.toISOString().slice(0, 10);
+  const week = weekOf(now);
+  const month = day.slice(0, 7);
+  return [
+    { path: `usage/${uid}_${day}`, limit: DAILY_MESSAGE_LIMIT.value(), fields: { uid, day, limit: DAILY_MESSAGE_LIMIT.value() } },
+    { path: `usage/${uid}_w${week}`, limit: WEEKLY_MESSAGE_LIMIT.value(), fields: { uid, week, limit: WEEKLY_MESSAGE_LIMIT.value() } },
+    { path: `usage/${uid}_m${month}`, limit: MONTHLY_MESSAGE_LIMIT.value(), fields: { uid, month, limit: MONTHLY_MESSAGE_LIMIT.value() } },
+  ];
+}
+
+function clientIp(req) {
+  return (req.get("x-forwarded-for") || "").split(",")[0].trim() || req.ip || "unknown";
 }
 
 exports.chat = onRequest(
@@ -110,26 +175,57 @@ exports.chat = onRequest(
     // 1. Who is this?
     const match = (req.get("authorization") || "").match(/^Bearer (.+)$/);
     if (!match) return res.status(401).json({ error: "Sign in to chat." });
-    let uid;
+    let uid, guest, verified;
     try {
-      uid = (await getAuth().verifyIdToken(match[1])).uid;
+      const token = await getAuth().verifyIdToken(match[1]);
+      uid = token.uid;
+      guest = token.firebase?.sign_in_provider === "anonymous";
+      // Accounts must have entered the emailed code this session.
+      verified = token.otp === true;
     } catch {
       return res.status(401).json({ error: "Your session expired. Sign in again." });
+    }
+    if (!guest && !verified) return res.status(401).json({ error: "Enter the code we emailed you to finish signing in." });
+    if (!guest) {
+      const profile = await getFirestore().doc(`users/${uid}`).get();
+      if (!profile.get("birthDate") || profile.get("ineligible")) {
+        return res.status(403).json({ error: "Finish setting up your account to chat." });
+      }
     }
 
     // 2. Is the request reasonable?
     const { messages, error } = cleanMessages(req.body && req.body.messages);
+    const requested = MODELS[req.body && req.body.model] ? req.body.model : DEFAULT_MODEL;
+    const model = MODELS[requested].accountsOnly && guest ? MODELS[DEFAULT_MODEL] : MODELS[requested];
     if (error) return res.status(400).json({ error });
 
-    // 3. Within today's limit?
+    // 3. Within the limit? Guests get a fixed number of free messages; accounts get a daily allowance.
+    const day = new Date().toISOString().slice(0, 10); // UTC day
     try {
-      if (!(await takeQuota(uid))) {
-        return res.status(429).json({ error: "You've reached today's message limit. Try again tomorrow." });
+      if (guest) {
+        const ipHash = createHash("sha256").update(clientIp(req)).digest("hex").slice(0, 32);
+        const full = await takeQuota([
+          { path: `usage/guest_${uid}`, limit: GUEST_MESSAGE_LIMIT.value(), fields: { uid, guest: true } },
+          { path: `usage/ip_${ipHash}_${day}`, limit: GUEST_IP_DAILY_LIMIT.value(), fields: { day, guest: true } },
+        ]);
+        if (full !== -1) {
+          return res.status(403).json({ error: "You've used your free messages. Sign up to keep chatting.", code: "guest_limit" });
+        }
+      } else {
+        const full = await takeQuota(accountCounters(uid, new Date()));
+        if (full !== -1) {
+          const [code, error] = LIMIT_ERRORS[full];
+          return res.status(429).json({ error, code });
+        }
       }
     } catch (e) {
       logger.error("Quota check failed", e);
       return res.status(500).json({ error: "Couldn't check your usage. Try again." });
     }
+
+    // Count this message's topic (not its text) for the homepage. Runs alongside the reply.
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) countTopic(lastUser.content);
 
     // 4. Forward to the model server and stream the reply back.
     const controller = new AbortController();
@@ -145,8 +241,8 @@ exports.chat = onRequest(
           model: MODEL_NAME.value(),
           stream: true,
           temperature: 0.7,
-          max_tokens: 2048,
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+          max_tokens: model.maxTokens,
+          messages: [{ role: "system", content: model.style ? `${SYSTEM_PROMPT} ${model.style}` : SYSTEM_PROMPT }, ...messages],
         }),
         signal: controller.signal,
       });

@@ -31,3 +31,6 @@ firebase-debug.log
 .env
 .env.local
 *serviceAccount*.json
+
+# Web app build output
+web/dist/

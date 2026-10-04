@@ -1,42 +1,107 @@
 rules_version = '2';
 
 // ARTICxAI: each signed-in user can only read and write their own chats.
-// Layout:  users/{uid}/chats/{chatId}                      { title, createdAt, updatedAt }
+// Layout:  users/{uid}                                     { firstName, birthDate, country, createdAt }
+//          users/{uid}/chats/{chatId}                      { title, createdAt, updatedAt, pinned?, shareId? }
 //          users/{uid}/chats/{chatId}/messages/{messageId} { role, content, createdAt }
-// Everything else (including usage/ quota docs written by the Cloud Function) is denied to browsers.
+//          usage/{uid}_{YYYY-MM-DD}, _w{YYYY-MM-DD}, _m{YYYY-MM}  { count, limit } (read-only: day, week, month counts)
+//          interest/{uid}_{item}                            { uid, item, createdAt } ("Notify me" for a paid plan or add-on)
+//          shares/{shareId}                                 { uid, title, messages, createdAt } (written by the shareChat function)
+//          feedback/{id}                                    { uid, chatId, rating, reason, details, prompt, reply, createdAt }
+//          waitlist/{sha256(email)}                         { email, firstName, province, interests, lang, consent, status, createdAt } (server only)
+// Everything else (other usage/, otp/, throttle/, waitlist/ written by Cloud Functions) is denied to browsers.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isOwner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
+    // A session that entered the emailed code (custom token with otp).
+    function verifiedOwner(uid) {
+      return isOwner(uid) && request.auth.token.get('otp', false) == true;
+    }
     function validTitle(t) {
       return t is string && t.size() > 0 && t.size() <= 120;
     }
 
-    match /users/{uid}/chats/{chatId} {
-      allow read, delete: if isOwner(uid);
+    // Profile { firstName, birthDate, country, createdAt }: written only by the
+    // completeProfile Cloud Function, readable by its owner.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
 
-      allow create: if isOwner(uid)
+    // An account's own day, week and month counters (Settings > Usage). Written only by the chat function.
+    match /usage/{id} {
+      allow get: if request.auth != null && request.auth.token.get('otp', false) == true
+        && id.matches(request.auth.uid + '_(w?[0-9]{4}-[0-9]{2}-[0-9]{2}|m[0-9]{4}-[0-9]{2})');
+      allow list, write: if false;
+    }
+
+    // "Notify me" taps for paid plans and add-ons, one document per account and item.
+    match /interest/{id} {
+      allow get: if request.auth != null && id.matches(request.auth.uid + '_(plus|pro|pack)');
+      allow create: if request.auth != null && request.auth.token.get('otp', false) == true
+        && id == request.auth.uid + '_' + request.resource.data.item
+        && request.resource.data.keys().hasOnly(['uid', 'item', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.item in ['plus', 'pro', 'pack']
+        && request.resource.data.createdAt == request.time;
+      allow list, update, delete: if false;
+    }
+
+    // A shared chat: anyone with the link can open it; its owner can delete it.
+    match /shares/{shareId} {
+      allow get: if true;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow list, create, update: if false;
+    }
+
+    // Thumbs up / down on a reply. Write-only: browsers can never read feedback back.
+    // A thumbs up carries only the rating; a thumbs down may include the question, reply and a note.
+    match /feedback/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid', 'chatId', 'rating', 'reason', 'details', 'prompt', 'reply', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.rating in ['up', 'down']
+        && request.resource.data.get('chatId', '') is string && request.resource.data.get('chatId', '').size() <= 64
+        && request.resource.data.get('reason', '') is string && request.resource.data.get('reason', '').size() <= 40
+        && request.resource.data.get('details', '') is string && request.resource.data.get('details', '').size() <= 2000
+        && request.resource.data.get('prompt', '') is string && request.resource.data.get('prompt', '').size() <= 100000
+        && request.resource.data.get('reply', '') is string && request.resource.data.get('reply', '').size() <= 100000
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
+    match /users/{uid}/chats/{chatId} {
+      allow read, delete: if verifiedOwner(uid);
+
+      allow create: if verifiedOwner(uid)
         && request.resource.data.keys().hasOnly(['title', 'createdAt', 'updatedAt'])
         && validTitle(request.resource.data.title)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
-      allow update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['title', 'createdAt', 'updatedAt'])
+      // Renaming and pinning keep updatedAt, so the chat doesn't jump to the top.
+      // shareId is set only by the shareChat function.
+      allow update: if verifiedOwner(uid)
+        && request.resource.data.keys().hasOnly(['title', 'createdAt', 'updatedAt', 'pinned', 'shareId'])
         && validTitle(request.resource.data.title)
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.get('shareId', null) == resource.data.get('shareId', null)
+        && (request.resource.data.updatedAt == request.time || request.resource.data.updatedAt == resource.data.updatedAt)
+        && (request.resource.data.get('pinned', null) == null
+            || request.resource.data.pinned == request.time
+            || request.resource.data.pinned == resource.data.get('pinned', null));
 
       match /messages/{messageId} {
-        allow read, delete: if isOwner(uid);
+        allow read, delete: if verifiedOwner(uid);
 
-        allow create: if isOwner(uid)
+        allow create: if verifiedOwner(uid)
           && request.resource.data.keys().hasOnly(['role', 'content', 'createdAt'])
           && request.resource.data.role in ['user', 'assistant']
           && request.resource.data.content is string
-          && request.resource.data.content.size() <= 40000
+          && request.resource.data.content.size() <= 100000
           && request.resource.data.createdAt == request.time;
 
         // Messages are immutable once written.
