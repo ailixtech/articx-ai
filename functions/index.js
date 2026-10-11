@@ -37,6 +37,9 @@ const MODEL_API_KEY = defineSecret("MODEL_API_KEY"); // bearer token your model 
 const MODEL_NAME = defineString("MODEL_NAME");
 // Name of the fine-tuned Maple 0.5 Quick model on your model server (empty = use MODEL_NAME).
 const MODEL_NAME_QUICK = defineString("MODEL_NAME_QUICK", { default: "" });
+// Optional separate server for Maple 0.5 Quick (e.g. mlx_lm.server on a Mac via a tunnel, no key).
+// Empty = same server as the other models (MODEL_API_URL / MODEL_API_KEY).
+const MODEL_API_URL_QUICK = defineString("MODEL_API_URL_QUICK", { default: "" });
 const ALLOWED_ORIGINS = defineString("ALLOWED_ORIGINS", { default: "" });
 const DAILY_MESSAGE_LIMIT = defineInt("DAILY_MESSAGE_LIMIT", { default: 200 });
 // Weekly (Monday to Sunday, UTC) and monthly caps on top of the daily one.
@@ -236,8 +239,9 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const systemPrompt = search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
 
     try {
-      const base = MODEL_API_URL.value().replace(/\/+$/, "");
-      const key = MODEL_API_KEY.value();
+      const quickUrl = model.quick ? MODEL_API_URL_QUICK.value() : "";
+      const base = (quickUrl || MODEL_API_URL.value()).replace(/\/+$/, "");
+      const key = quickUrl ? "none" : MODEL_API_KEY.value();
       const upstream = await fetch(`${base}/chat/completions`, {
         method: "POST",
         
