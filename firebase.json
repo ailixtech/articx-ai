@@ -5,6 +5,9 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
     "trailingSlash": false,
+    "redirects": [
+      { "source": "/", "destination": "/waitlist", "type": 302 }
+    ],
     "rewrites": [
       { "source": "/api/topics", "function": { "functionId": "topics", "region": "northamerica-northeast2" } },
       { "source": "/api/waitlist", "function": { "functionId": "waitlist", "region": "northamerica-northeast2" } },

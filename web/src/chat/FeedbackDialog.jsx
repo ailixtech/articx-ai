@@ -31,7 +31,7 @@ export default function FeedbackDialog({ onSubmit, onClose }) {
     const [title, body] = t.thanks[sent] || t.thanks[""];
     return (
       <Dialog title={title} onClose={onClose} width={460}>
-        <div aria-hidden="true" className="mb-4 grid size-11 place-items-center rounded-full bg-lake/12 text-lake">
+        <div aria-hidden="true" className="mb-4 grid size-11 place-items-center rounded-full bg-lake/12 text-lake-deep">
           <CheckIcon className="i size-[22px]" />
         </div>
         <p role="status" className="m-0 text-[.95rem] leading-relaxed">{body}</p>

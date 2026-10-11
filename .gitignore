@@ -34,3 +34,6 @@ firebase-debug.log
 
 # Web app build output
 web/dist/
+
+# Fused fine-tuned models (mlx_lm.fuse output)
+models/

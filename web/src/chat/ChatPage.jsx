@@ -23,11 +23,23 @@ import UsageBar from "./UsageBar";
 import Composer from "./Composer";
 import FeedbackDialog from "./FeedbackDialog";
 import ShareDialog from "./ShareDialog";
+import { AccountChooser, LogoutDialog, forgetAccount, rememberAccount, rememberedAccount } from "./AccountDialogs";
 import { GateCard, LimitNotice, MessageList } from "./Messages";
 import { MenuIcon, PenIcon, SidebarIcon } from "../components/Icons";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { Brand, btn, iconBtn } from "../components/ui";
+import { LogoMark } from "../components/Logo";
 import { useLang } from "../i18n";
+
+// Web search sources from the chat function: at most 6, http(s) links only.
+function cleanSources(list) {
+  if (!Array.isArray(list)) return null;
+  const out = list
+    .filter((x) => x && typeof x.url === "string" && /^https?:\/\//i.test(x.url))
+    .slice(0, 6)
+    .map((x) => ({ title: String(x.title || x.url).slice(0, 200), url: x.url.slice(0, 2000) }));
+  return out.length ? out : null;
+}
 
 const MAX_SAVED_CHARS = 100000; // must match firestore.rules
 const PENDING_KEY = "articx-pending";
@@ -63,7 +75,7 @@ function loadGuestChat() {
   try {
     const list = JSON.parse(store("session", GUEST_CHAT_KEY) || "[]");
     return Array.isArray(list)
-      ? list.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map(({ role, content }) => ({ role, content }))
+      ? list.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map(({ role, content, sources, searched }) => { const src = cleanSources(sources); return { role, content, ...(src ? { sources: src } : {}), ...(searched === true ? { searched: true } : {}) }; })
       : [];
   } catch { return []; }
 }
@@ -90,6 +102,8 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [chooser, setChooser] = useState(null); // remembered account shown in "Welcome back", or {} for none
   const [usage, setUsage] = useState(null); // { used, limit } for today
   const [chats, setChats] = useState([]);
   const [chatId, setChatIdState] = useState(null);
@@ -121,6 +135,7 @@ export default function ChatPage() {
   const sessionRef = useRef(0); // bumps whenever the visible chat changes
   const expectRoute = useRef(undefined); // route we navigated to ourselves
   const prevUid = useRef(undefined);
+  const loggedOut = useRef(false); // set by logOut so the chooser opens once the session ends
   const stickRef = useRef(false);
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -170,7 +185,7 @@ export default function ChatPage() {
       const snap = await getDocs(query(messagesCol(userRef.current.uid, id), orderBy("createdAt")));
       if (sessionRef.current !== my) return;
       stickRef.current = true;
-      setMessages(snap.docs.map((d) => ({ role: d.get("role"), content: d.get("content") })));
+      setMessages(snap.docs.map((d) => { const src = cleanSources(d.get("sources")); return { role: d.get("role"), content: d.get("content"), ...(src ? { sources: src } : {}), ...(d.get("searched") === true ? { searched: true } : {}) }; }));
     } catch (e) {
       console.error(e);
       if (sessionRef.current === my) setNotice(tRef.current.loadFailed);
@@ -248,6 +263,21 @@ export default function ChatPage() {
   }
 
   // ---------- Signing in / out ----------
+  // "Sign in" goes through the account chooser when this device remembers an account.
+  function openSignIn() {
+    const last = rememberedAccount();
+    if (last) setChooser(last);
+    else setAuthView({ step: "signin" });
+  }
+  function logOut() {
+    const u = userRef.current;
+    setConfirmLogout(false);
+    rememberAccount(u);
+    stopStreaming();
+    loggedOut.current = true;
+    signOut(fb.auth);
+  }
+
   // Runs when the account switches between guest and signed in (not on every auth event).
   useEffect(() => {
     if (phase === "loading") return;
@@ -258,6 +288,9 @@ export default function ChatPage() {
     sessionRef.current++;
     setMenuOpen(false);
     setSettingsOpen(false);
+    setConfirmLogout(false);
+    setChooser(!uid && loggedOut.current ? rememberedAccount() || {} : null);
+    loggedOut.current = false;
     setFeedbackFor(null);
     setShareFor(null);
     setModelChoice(savedModel(!!uid));
@@ -296,7 +329,7 @@ export default function ChatPage() {
       await setDoc(ref, { title, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       // One at a time so each message gets a later server timestamp and keeps its order.
       for (const m of list) {
-        await addDoc(messagesCol(u, ref.id), { role: m.role, content: m.content.slice(0, MAX_SAVED_CHARS), createdAt: serverTimestamp() });
+        await addDoc(messagesCol(u, ref.id), { role: m.role, content: m.content.slice(0, MAX_SAVED_CHARS), ...(m.sources ? { sources: m.sources } : {}), ...(m.searched ? { searched: true } : {}), createdAt: serverTimestamp() });
       }
     } catch (e) { saveError(e); }
   }
@@ -306,7 +339,7 @@ export default function ChatPage() {
     if (phase !== "guest") return;
     const h = location.hash;
     if (h === "#signin" || h === "#signup") {
-      setAuthView({ step: h.slice(1) });
+      if (h === "#signin") openSignIn(); else setAuthView({ step: "signup" });
       navigate(location.pathname, { replace: true });
     }
   }, [location.hash, phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -446,7 +479,7 @@ export default function ChatPage() {
     const controller = new AbortController();
     controllerRef.current = controller;
     setStreaming(true);
-    let reply = "", queued = false, done = false, errorText = null, guestLimit = false;
+    let reply = "", sources = null, searched = false, aborted = false, queued = false, done = false, errorText = null, guestLimit = false;
     const paint = () => {
       queued = false;
       if (done || sessionRef.current !== my) return;
@@ -458,10 +491,12 @@ export default function ChatPage() {
         history, model, backend, cloudUrl, signal: controller.signal,
         getToken: () => tokenFor(u),
         onToken: (tok) => { reply += tok; if (!queued) { queued = true; requestAnimationFrame(paint); } },
+        onSources: (list, s) => { sources = cleanSources(list); searched = s; },
       });
     } catch (e) {
       if (asGuest && e.status === 403) guestLimit = true;
-      else if (e.name !== "AbortError") { errorText = friendlyError(e, backend, L); console.error(e); }
+      else if (e.name === "AbortError") aborted = true;
+      else { errorText = friendlyError(e, backend, L); console.error(e); }
     } finally {
       done = true;
       if (controllerRef.current === controller) controllerRef.current = null;
@@ -479,11 +514,12 @@ export default function ChatPage() {
     }
     if (stillHere) {
       stickRef.current = nearBottom() || !!errorText;
-      setMessages((m) => (reply.trim() ? replaceLast(m, { role: "assistant", content: reply }) : m.slice(0, -1)));
+      setMessages((m) => (reply.trim() ? replaceLast(m, { role: "assistant", content: reply, ...(sources ? { sources } : {}), ...(searched ? { searched } : {}) }) : m.slice(0, -1)));
       if (errorText) setNotice(errorText);
+      else if (!reply.trim() && !aborted && !guestLimit) setNotice(L.chat.errors.empty);
     }
     if (reply.trim() && !asGuest) {
-      addDoc(messagesCol(u.uid, id), { role: "assistant", content: reply.slice(0, MAX_SAVED_CHARS), createdAt: serverTimestamp() }).catch(saveError);
+      addDoc(messagesCol(u.uid, id), { role: "assistant", content: reply.slice(0, MAX_SAVED_CHARS), ...(sources ? { sources } : {}), ...(searched ? { searched: true } : {}), createdAt: serverTimestamp() }).catch(saveError);
       updateDoc(doc(chatsCol(u.uid), id), { updatedAt: serverTimestamp() }).catch(saveError);
     }
     if (asGuest && !userRef.current && stillHere) saveGuestChat(msgsRef.current);
@@ -523,18 +559,18 @@ export default function ChatPage() {
             )}
             {uid ? (
               <>
-                <Link to="/" aria-label={T.menu.home} title={T.menu.home} className="inline-grid size-10 flex-none place-items-center rounded-[10px] hover:bg-bg-2">
-                  <img src="/favicon.svg" alt="" className="size-[28px] rounded-[7px]" />
+                <Link to="/" aria-label="ArticxAI" className="inline-grid size-10 flex-none place-items-center rounded-[10px] text-ink hover:bg-bg-2">
+                  <LogoMark className="h-6 w-auto" />
                 </Link>
                 {usage && <div className="hidden sm:block"><UsageBar used={usage.used} limit={usage.limit} /></div>}
               </>
-            ) : <Brand compact />}
+            ) : <Brand icon={false} />}
           </div>
           {uid && <p className="m-0 hidden max-w-[42%] flex-[0_1_auto] truncate font-head text-[.93rem] font-semibold text-ink lg:block">{currentChat?.title || ""}</p>}
           <div className="flex min-w-0 flex-1 items-center justify-end gap-[.35rem]">
             <ThemeSwitch pref={themePref} onChange={setThemePref} />
             {!uid && <>
-              <button type="button" className={btn("quiet", "sm")} onClick={() => setAuthView({ step: "signin" })}>{T.menu.signIn}</button>
+              <button type="button" className={btn("quiet", "sm")} onClick={openSignIn}>{T.menu.signIn}</button>
               <button type="button" className={btn("primary", "sm")} onClick={() => setAuthView({ step: "signup" })}>{T.menu.signUp}</button>
             </>}
             {uid && <>
@@ -562,7 +598,7 @@ export default function ChatPage() {
               ratings={ratings} onRate={(i, r) => rate(i, r)} onDislike={setFeedbackFor} onToast={showToast}
               gate={gated ? (
                 <GateCard pending={pending} hadChat={messages.length > 0} onEdit={editPending}
-                  onAuth={(step) => setAuthView({ step })} />
+                  onAuth={(step) => (step === "signin" ? openSignIn() : setAuthView({ step }))} />
               ) : limitReached && <LimitNotice onSignUp={() => setAuthView({ step: "signup" })} />} />
           )}
           {!gated && (
@@ -584,12 +620,20 @@ export default function ChatPage() {
         <UserMenu user={user} usage={usage} anchorRef={avatarRef} onClose={() => setMenuOpen(false)}
           onHistory={() => { setMenuOpen(false); setSidebarOpen(true); setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 220); }}
           onSettings={() => { setMenuOpen(false); setSettingsOpen(true); }}
-          onSignOut={() => { setMenuOpen(false); stopStreaming(); signOut(fb.auth); }} />
+          onSignOut={() => { setMenuOpen(false); setConfirmLogout(true); }} />
       )}
       {settingsOpen && uid && (
         <Settings user={user} usage={usage} themePref={themePref} onTheme={setThemePref} model={model} onModel={chooseModel}
           backend={backend} onBackend={setBackend} onClose={() => setSettingsOpen(false)} fb={fb}
-          onSignOut={() => { setSettingsOpen(false); stopStreaming(); signOut(fb.auth); }} />
+          onSignOut={() => { setSettingsOpen(false); setConfirmLogout(true); }} />
+      )}
+      {confirmLogout && uid && <LogoutDialog user={user} onConfirm={logOut} onClose={() => setConfirmLogout(false)} />}
+      {chooser && !uid && !authView.step && (
+        <AccountChooser account={chooser.email ? chooser : null} onClose={() => setChooser(null)}
+          onForget={() => { forgetAccount(); setChooser({}); }}
+          onPick={(a) => { setChooser(null); setAuthView({ step: "signin", email: a.email }); }}
+          onAnother={() => { setChooser(null); setAuthView({ step: "signin" }); }}
+          onCreate={() => { setChooser(null); setAuthView({ step: "signup" }); }} />
       )}
       {feedbackFor != null && (
         <FeedbackDialog onClose={() => setFeedbackFor(null)} onSubmit={(extra) => rate(feedbackFor, "down", extra)} />

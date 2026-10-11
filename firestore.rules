@@ -3,12 +3,13 @@ rules_version = '2';
 // ARTICxAI: each signed-in user can only read and write their own chats.
 // Layout:  users/{uid}                                     { firstName, birthDate, country, createdAt }
 //          users/{uid}/chats/{chatId}                      { title, createdAt, updatedAt, pinned?, shareId? }
-//          users/{uid}/chats/{chatId}/messages/{messageId} { role, content, createdAt }
+//          users/{uid}/chats/{chatId}/messages/{messageId} { role, content, createdAt, sources? }
 //          usage/{uid}_{YYYY-MM-DD}, _w{YYYY-MM-DD}, _m{YYYY-MM}  { count, limit } (read-only: day, week, month counts)
 //          interest/{uid}_{item}                            { uid, item, createdAt } ("Notify me" for a paid plan or add-on)
 //          shares/{shareId}                                 { uid, title, messages, createdAt } (written by the shareChat function)
 //          feedback/{id}                                    { uid, chatId, rating, reason, details, prompt, reply, createdAt }
-//          waitlist/{sha256(email)}                         { email, firstName, province, interests, lang, consent, status, createdAt } (server only)
+//          waitlist/{sha256(email)}                         { firstName, email, province, language, consent, consentAt, consentVersion, source, status, createdAt } (server only)
+//          stats/waitlist                                   { count, updatedAt } (public count on /waitlist; written by the countWaitlist function)
 // Everything else (other usage/, otp/, throttle/, waitlist/ written by Cloud Functions) is denied to browsers.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -48,6 +49,17 @@ service cloud.firestore {
         && request.resource.data.item in ['plus', 'pro', 'pack']
         && request.resource.data.createdAt == request.time;
       allow list, update, delete: if false;
+    }
+
+    // Waitlist sign-ups: written only by the waitlist Cloud Function, never readable from a browser.
+    match /waitlist/{id} {
+      allow read, write: if false;
+    }
+
+    // Public stats: only the waitlist counter can be read, and nothing can be written from a browser.
+    match /stats/{id} {
+      allow get: if id == 'waitlist';
+      allow list, write: if false;
     }
 
     // A shared chat: anyone with the link can open it; its owner can delete it.
@@ -98,7 +110,9 @@ service cloud.firestore {
         allow read, delete: if verifiedOwner(uid);
 
         allow create: if verifiedOwner(uid)
-          && request.resource.data.keys().hasOnly(['role', 'content', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['role', 'content', 'createdAt', 'sources', 'searched'])
+          && (!('sources' in request.resource.data) || (request.resource.data.sources is list && request.resource.data.sources.size() <= 6))
+          && (!('searched' in request.resource.data) || request.resource.data.searched == true)
           && request.resource.data.role in ['user', 'assistant']
           && request.resource.data.content is string
           && request.resource.data.content.size() <= 100000

@@ -8,7 +8,7 @@ import {
 } from "../components/Icons";
 
 const navLink = "hidden rounded-lg px-3 py-2 font-head text-[.9rem] font-medium text-muted no-underline hover:text-ink lg:inline";
-const eyebrow = "m-0 mb-4 font-head text-[.78rem] font-semibold tracking-[.12em] text-lake uppercase";
+const eyebrow = "m-0 mb-4 font-head text-[.78rem] font-semibold tracking-[.12em] text-lake-deep uppercase";
 const h2 = "m-0 max-w-[22ch] text-[clamp(2rem,4vw,3rem)] font-bold leading-[1.06] tracking-[-.035em]";
 const lead = "mt-4 mb-0 max-w-[58ch] text-[1.06rem] leading-[1.7] text-muted";
 const section = "border-t border-line py-[clamp(4.5rem,10vw,7.5rem)]";
@@ -55,7 +55,7 @@ export default function Home() {
                   </div>
                   <p className="mt-4 mb-6 text-[1rem] leading-relaxed text-muted">{m.text}</p>
                   <ul className="m-0 mb-6 list-none space-y-2.5 p-0">
-                    {m.points.map((p) => <li key={p} className="flex items-center gap-2.5 text-[.95rem]"><CheckIcon className="i size-4 text-lake" />{p}</li>)}
+                    {m.points.map((p) => <li key={p} className="flex items-center gap-2.5 text-[.95rem]"><CheckIcon className="i size-4 text-lake-deep" />{p}</li>)}
                   </ul>
                   <div className="mb-8 flex items-center gap-2">
                     <span className="mr-1 font-head text-[.78rem] font-semibold tracking-[.08em] text-muted uppercase">{h.models.languages}</span>
@@ -83,11 +83,11 @@ export default function Home() {
             <ol className="m-0 list-none space-y-4 p-0">
               {h.residency.items.map(([title, where, text], i) => ({ icon: RESIDENCY_ICONS[i], title, where, text, out: i === 2 })).map(({ icon: Icon, title, where, text, out }) => (
                 <li key={title} className="grid grid-cols-[auto_1fr] gap-5 rounded-2xl border border-line bg-surface p-6">
-                  <span className={`grid size-11 place-items-center rounded-xl ${out ? "bg-bg-2 text-muted" : "bg-lake-soft text-lake"}`}><Icon /></span>
+                  <span className={`grid size-11 place-items-center rounded-xl ${out ? "bg-bg-2 text-muted" : "bg-lake-soft text-lake-deep"}`}><Icon /></span>
                   <div>
                     <h3 className="m-0 flex flex-wrap items-center gap-2.5 text-[1.05rem] font-semibold">
                       {title}
-                      <span className={`rounded-full px-2.5 py-0.5 font-head text-[.75rem] font-semibold ${out ? "bg-bg-2 text-muted" : "bg-lake-soft text-lake"}`}>{where}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 font-head text-[.75rem] font-semibold ${out ? "bg-bg-2 text-muted" : "bg-lake-soft text-lake-deep"}`}>{where}</span>
                     </h3>
                     <p className="mt-1.5 mb-0 text-[.95rem] leading-relaxed text-muted">{text}</p>
                   </div>
@@ -97,7 +97,7 @@ export default function Home() {
                 <h3 className="m-0 text-[1.05rem] font-semibold">{h.residency.securityTitle}</h3>
                 <ul className="mt-4 mb-0 grid list-none gap-3 p-0 sm:grid-cols-2">
                   {h.residency.security.map((x) => (
-                    <li key={x} className="flex items-center gap-2.5 text-[.93rem] text-muted"><CheckIcon className="i size-4 text-lake" />{x}</li>
+                    <li key={x} className="flex items-center gap-2.5 text-[.93rem] text-muted"><CheckIcon className="i size-4 text-lake-deep" />{x}</li>
                   ))}
                 </ul>
               </li>
@@ -112,7 +112,7 @@ export default function Home() {
             <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3">
               {h.principles.items.map(([title, text], i) => ({ n: `0${i + 1}`, title, text })).map((p) => (
                 <div key={p.n} className="bg-surface p-8">
-                  <span className="font-mono text-[.85rem] text-lake">{p.n}</span>
+                  <span className="font-mono text-[.85rem] text-lake-deep">{p.n}</span>
                   <h3 className="mt-6 mb-2 text-[1.15rem] font-semibold tracking-[-.015em]">{p.title}</h3>
                   <p className="m-0 text-[.95rem] leading-relaxed text-muted">{p.text}</p>
                 </div>
@@ -193,7 +193,7 @@ function Facts({ h }) {
       <div className={`${wrap} grid divide-line sm:grid-cols-2 sm:divide-x lg:grid-cols-4`}>
         {h.facts.map(([title, text], i) => ({ icon: FACT_ICONS[i], title, text })).map(({ icon: Icon, title, text }) => (
           <div key={title} className="flex gap-4 border-b border-line py-8 sm:px-6 sm:first:pl-0 lg:border-b-0">
-            <Icon className="i mt-0.5 text-lake" />
+            <Icon className="i mt-0.5 text-lake-deep" />
             <div>
               <h3 className="m-0 font-head text-[.95rem] font-semibold">{title}</h3>
               <p className="mt-1 mb-0 text-[.88rem] leading-relaxed text-muted">{text}</p>
@@ -289,11 +289,11 @@ function UseCases({ h }) {
                 <Link to="/chat" className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 text-ink no-underline transition-[border-color,box-shadow] hover:border-lake/50 hover:shadow-card">
                   <span className="flex items-center justify-between gap-3">
                     <span className="font-head text-[.75rem] font-semibold tracking-[.1em] text-muted uppercase">{tag}</span>
-                    {popular && <span className="rounded-full bg-lake/10 px-[.6rem] py-[.15rem] font-head text-[.72rem] font-semibold text-lake">{u.popular}</span>}
+                    {popular && <span className="rounded-full bg-lake/10 px-[.6rem] py-[.15rem] font-head text-[.72rem] font-semibold text-lake-deep">{u.popular}</span>}
                   </span>
                   <span className="mt-4 mb-5 font-head text-[1.05rem] leading-snug font-semibold tracking-[-.01em]">“{prompt}”</span>
                   <span className="mt-auto text-[.92rem] leading-relaxed text-muted">{text}</span>
-                  <span className="mt-5 inline-flex items-center gap-1.5 font-head text-[.85rem] font-semibold text-lake">
+                  <span className="mt-5 inline-flex items-center gap-1.5 font-head text-[.85rem] font-semibold text-lake-deep">
                     {u.ask} <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
                   </span>
                 </Link>

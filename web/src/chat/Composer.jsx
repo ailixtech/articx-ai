@@ -78,7 +78,7 @@ export default function Composer({ value, onChange, pastes, onPastes, onSubmit, 
         </div>
       )}
       {isGuest && guestLeft > 0 && (
-        <p className="mt-[.55rem] mb-0 text-center text-[.8rem] font-medium text-lake">
+        <p className="mt-[.55rem] mb-0 text-center text-[.8rem] font-medium text-lake-deep">
           {t.guestLeft(guestLeft)}
         </p>
       )}

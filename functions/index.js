@@ -12,6 +12,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
 const { createHash } = require("node:crypto");
+const { TAVILY_API_KEY, getSearchContext } = require("./search");
 
 initializeApp();
 
@@ -34,6 +35,8 @@ const MODEL_API_KEY = defineSecret("MODEL_API_KEY"); // bearer token your model 
 
 // Plain config (functions/.env)
 const MODEL_NAME = defineString("MODEL_NAME");
+// Name of the fine-tuned Maple 0.5 Quick model on your model server (empty = use MODEL_NAME).
+const MODEL_NAME_QUICK = defineString("MODEL_NAME_QUICK", { default: "" });
 const ALLOWED_ORIGINS = defineString("ALLOWED_ORIGINS", { default: "" });
 const DAILY_MESSAGE_LIMIT = defineInt("DAILY_MESSAGE_LIMIT", { default: 200 });
 // Weekly (Monday to Sunday, UTC) and monthly caps on top of the daily one.
@@ -53,27 +56,18 @@ const MAX_CHARS_PER_MESSAGE = 100000;
 // set it to what your model server's context window can hold (roughly 4 characters per token).
 const MAX_CONTEXT_CHARS = defineInt("MAX_CONTEXT_CHARS", { default: 120000 });
 
-const SYSTEM_PROMPT = [
-  "You are Maple, the AI assistant of ARTICxAI, made in Canada by AILIX.",
-  "You do not have internet access, live data, or the ability to search the web.",
-  "Your knowledge comes from training data that stops at a cutoff date and may be outdated.",
-  "If asked about news, current events, today's date, prices, scores, weather, elections, or anything that may have changed recently, say plainly that you can't check live information and suggest a reliable current source. Never present recent events as confirmed fact.",
-  "Never invent URLs, citations, quotes, statistics, or sources. If you don't know a source, say so. Only mention well-known homepages (e.g. canada.ca) when you are certain they exist.",
-  "If asked what model you are built on, say you are built on an open-source base model adapted by AILIX.",
-  "Be helpful, clear and concise. Reply in the language the user writes in: Canadian English (with Canadian spelling) or French.",
-].join(" ");
+const { SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, STYLES } = require("./prompts");
 
 // Maple models offered in the app. Both run on MODEL_NAME; Maple Q1 asks for short,
 // precise answers and has a smaller reply budget. Guests can only use the default.
 // Keep ids in step with MODELS in web/src/config.js.
 const DEFAULT_MODEL = "maple-0.5";
 const MODELS = {
-  "maple-0.5": { maxTokens: 2048, style: "" },
-  "maple-q1": {
-    maxTokens: 700,
-    style: "Answer as briefly and precisely as possible: lead with the answer, use at most a few short sentences or a short list, and skip greetings, filler and repetition.",
-    accountsOnly: true,
-  },
+  "maple-0.5": { maxTokens: 2048, style: STYLES["maple-0.5"] },
+  "maple-q1": { maxTokens: 700, style: STYLES["maple-q1"], accountsOnly: true },
+  // Fine-tuned quick model (scripts/build-maple-quick.js). Served under MODEL_NAME_QUICK;
+  // until that's set it falls back to MODEL_NAME with the quick style.
+  "maple-0.5-quick": { maxTokens: 600, style: STYLES["maple-0.5-quick"], quick: true },
 };
 
 function projectId() {
@@ -151,7 +145,7 @@ function clientIp(req) {
 exports.chat = onRequest(
   {
     region: "northamerica-northeast2",
-    secrets: [MODEL_API_URL, MODEL_API_KEY],
+    secrets: [MODEL_API_URL, MODEL_API_KEY, TAVILY_API_KEY],
     timeoutSeconds: 300,
     memory: "256MiB",
     concurrency: 40,
@@ -224,25 +218,36 @@ exports.chat = onRequest(
     }
 
     // Count this message's topic (not its text) for the homepage. Runs alongside the reply.
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (lastUser) countTopic(lastUser.content);
+
+
+    // Fresh info from the web when needed. Runs after the quota check,
+    // so users over their limit never trigger a paid search.
+    const search = lastUser ? await getSearchContext(lastUser.content) : null;
+    if (search) logger.info("Web search used", { kind: search.kind, results: search.sources.length, links: search.links.length });
 
     // 4. Forward to the model server and stream the reply back.
     const controller = new AbortController();
     res.on("close", () => { if (!res.writableEnded) controller.abort(); });
+
+    const core = search ? SEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const basePrompt = model.style ? `${core} ${model.style}` : core;
+    const systemPrompt = search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
 
     try {
       const base = MODEL_API_URL.value().replace(/\/+$/, "");
       const key = MODEL_API_KEY.value();
       const upstream = await fetch(`${base}/chat/completions`, {
         method: "POST",
+        
         headers: { "Content-Type": "application/json", ...(key && key !== "none" ? { Authorization: `Bearer ${key}` } : {}) },
         body: JSON.stringify({
-          model: MODEL_NAME.value(),
+          model: (model.quick && MODEL_NAME_QUICK.value()) || MODEL_NAME.value(),
           stream: true,
           temperature: 0.7,
           max_tokens: model.maxTokens,
-          messages: [{ role: "system", content: model.style ? `${SYSTEM_PROMPT} ${model.style}` : SYSTEM_PROMPT }, ...messages],
+          messages: [{ role: "system", content: systemPrompt }, ...messages],
         }),
         signal: controller.signal,
       });
@@ -255,7 +260,50 @@ exports.chat = onRequest(
       res.status(200);
       res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
       res.flushHeaders();
-      for await (const chunk of upstream.body) res.write(chunk);
+      // Pass the stream through line by line, counting the text (to log empty replies),
+      // and hold back [DONE] so search links can be sent first as {"sources": [...]}.
+      // The app shows those as real links, separate from the model's text.
+      const decoder = new TextDecoder();
+      let buf = "", chars = 0, finish = null, firstBytes = "";
+      const forward = (line) => {
+        const t = line.trim();
+        if (t === "data: [DONE]") return;
+        if (t && !t.startsWith("data:") && !t.startsWith(":") && !t.startsWith("event:") && !t.startsWith("id:")) return;
+        if (t.startsWith("data:")) {
+          try {
+            const j = JSON.parse(t.slice(5));
+            chars += (j.choices?.[0]?.delta?.content || "").length;
+            finish = j.choices?.[0]?.finish_reason || finish;
+          } catch { /* not JSON */ }
+        }
+        res.write(line);
+      };
+      for await (const chunk of upstream.body) {
+        const text = decoder.decode(chunk, { stream: true });
+        if (firstBytes.length < 400) firstBytes += text.slice(0, 400 - firstBytes.length);
+        buf += text;
+        let idx;
+        while ((idx = buf.indexOf("\n")) >= 0) {
+          forward(buf.slice(0, idx + 1));
+          buf = buf.slice(idx + 1);
+        }
+      }
+      if (buf.trim()) forward(buf + "\n");
+      if (chars === 0) {
+        logger.warn("Model sent no text", { search: !!search, finish, promptChars: systemPrompt.length, firstBytes });
+        // e.g. "Error initializing the stream: HTTP 409" sent as plain text with status 200:
+        // turn it into a real error so the app tells the user instead of showing nothing.
+        res.write(`data: ${JSON.stringify({ error: { message: "The model server isn't responding right now." } })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        return res.end();
+      }
+      else if (search) logger.info("Search reply sent", { chars, finish });
+      // Links only when they really help (official rules, news); none for weather or simple facts.
+      if (search) {
+        const sources = search.links.map((src) => ({ title: String(src.title || src.url).slice(0, 200), url: src.url }));
+        res.write(`data: ${JSON.stringify({ sources, searched: true })}\n\n`);
+      }
+      res.write("data: [DONE]\n\n");
       res.end();
     } catch (e) {
       if (e.name === "AbortError") return; // user pressed Stop or closed the tab

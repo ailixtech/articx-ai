@@ -24,7 +24,7 @@ export function UserBubble({ content }) {
   );
 }
 
-const action = (on) => `${iconBtn} size-8! ${on ? "text-lake!" : ""}`;
+const action = (on) => `${iconBtn} size-8! ${on ? "text-lake-deep!" : ""}`;
 
 // Copy, thumbs up / down and share under each finished reply.
 // Without onRate (e.g. on a shared chat) only Copy is shown.
@@ -65,8 +65,7 @@ function ReplyActions({ text, rating, onRate, onDislike, onToast }) {
 export function AssistantMessage({ content, streaming, rating, onRate, onDislike, onToast }) {
   const { s } = useLang();
   return (
-    <div className={`${row} grid grid-cols-1 gap-[.4rem] lg:grid-cols-[30px_1fr] lg:gap-[.9rem]`}>
-      <img src="/favicon.svg" alt="Maple" className="mt-[.1rem] size-6 rounded-md lg:size-[30px] lg:rounded-lg" />
+    <div className={row}>
       <div className="min-w-0">
         {streaming && !content ? (
           <p role="status" className="m-0 flex h-[30px] items-center font-head text-[.95rem] font-medium">
@@ -92,9 +91,10 @@ export function MessageList({ messages, notice, listRef, gate, ratings = {}, onR
         <AssistantMessage key={i} content={m.content} streaming={m.streaming} rating={ratings[i]} onToast={onToast}
           onRate={onRate && ((r) => onRate(i, r))} onDislike={onDislike && (() => onDislike(i))} />
       );
-      if (!m.streaming && m.content && i > 0 && messages[i - 1].role === "user" && LIVE_TOPIC.test(messages[i - 1].content)) {
+      if (m.sources?.length && !m.streaming) items.push(<Sources key={`s${i}`} list={m.sources} label={s.chat.sources} />);
+      if (!m.streaming && m.content && !m.searched && !m.sources?.length && i > 0 && messages[i - 1].role === "user" && LIVE_TOPIC.test(messages[i - 1].content)) {
         items.push(
-          <p key={`n${i}`} className="mx-auto -mt-[.8rem] mb-[1.6rem] max-w-[760px] rounded-r-[10px] border-l-[3px] border-red bg-bg-2 px-[.9rem] py-[.65rem] text-[.87rem] text-muted lg:ml-[max(calc(50%-380px+2.75rem),2.75rem)]">
+          <p key={`n${i}`} className="mx-auto -mt-[.8rem] mb-[1.6rem] max-w-[760px] rounded-r-[10px] border-l-[3px] border-red bg-bg-2 px-[.9rem] py-[.65rem] text-[.87rem] text-muted">
             {s.chat.liveNote}
           </p>
         );
@@ -106,6 +106,26 @@ export function MessageList({ messages, notice, listRef, gate, ratings = {}, onR
       {items}
       {notice && <p role="alert" className="mx-auto mb-[1.6rem] max-w-[760px] rounded-[10px] border border-red px-[.9rem] py-[.65rem] text-[.87rem] text-ink">{notice}</p>}
       {gate}
+    </div>
+  );
+}
+
+// Links from the web search (sent by the chat function, not written by the model).
+function Sources({ list, label }) {
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  return (
+    <div className="mx-auto -mt-[.8rem] mb-[1.6rem] max-w-[760px]">
+      <p className="m-0 mb-[.35rem] text-[.8rem] font-semibold text-muted">{label}</p>
+      <ol className="m-0 flex list-none flex-col gap-[.3rem] p-0">
+        {list.map((src, n) => (
+          <li key={n} className="flex min-w-0 gap-2 text-[.87rem]">
+            <span className="flex-none text-muted">[{n + 1}]</span>
+            <a href={src.url} target="_blank" rel="noopener noreferrer nofollow" className="min-w-0 truncate text-lake-deep underline-offset-2 hover:underline">
+              {src.title} <span className="text-muted">· {host(src.url)}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -146,11 +166,11 @@ export function GateCard({ pending, hadChat, onEdit, onAuth }) {
             <button type="button" className={`${btn("primary")} w-full`} onClick={() => onAuth("signup")}>{g.create}</button>
           </div>
           <p className="mt-4 mb-0 text-[.9rem] text-muted">{g.haveAccount}{" "}
-            <button type="button" onClick={() => onAuth("signin")} className="cursor-pointer border-0 bg-transparent p-0 text-[.9rem] text-lake underline underline-offset-[3px]">{g.signIn}</button>
+            <button type="button" onClick={() => onAuth("signin")} className="cursor-pointer border-0 bg-transparent p-0 text-[.9rem] text-lake-deep underline underline-offset-[3px]">{g.signIn}</button>
           </p>
         </div>
         <ul className="m-0 flex list-none flex-col justify-center gap-[.95rem] border-t border-line p-0 pt-5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
-          {g.perks.map((text, i) => [PERK_ICONS[i], text]).map(([Icon, text]) => <li key={text} className="flex items-center gap-[.7rem] text-[.93rem]"><Icon className="i text-lake" />{text}</li>)}
+          {g.perks.map((text, i) => [PERK_ICONS[i], text]).map(([Icon, text]) => <li key={text} className="flex items-center gap-[.7rem] text-[.93rem]"><Icon className="i text-lake-deep" />{text}</li>)}
         </ul>
       </section>
     </>

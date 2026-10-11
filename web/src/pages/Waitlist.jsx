@@ -1,272 +1,364 @@
-import { useId, useRef, useState } from "react";
-import { Link } from "react-router";
-import { SiteFooter, SiteHeader, usePageTitle } from "../components/SiteLayout";
-import { btn, wrap } from "../components/ui";
+import "@fontsource/open-sans/800.css"; // logo and headline; 400–700 load in main.jsx
+import { useEffect, useId, useRef, useState } from "react";
+import { usePageTitle } from "../components/SiteLayout";
+import { CheckIcon, LEAF_PATH, LEAF_VIEWBOX, LockIcon } from "../components/Icons";
 import { useLang } from "../i18n";
-import { ChatIcon, CheckIcon, CopyIcon, Leaf, LockIcon, MailIcon, SparkIcon } from "../components/Icons";
-
-const eyebrow = "m-0 mb-4 font-head text-[.78rem] font-semibold tracking-[.12em] text-lake uppercase";
-const h2 = "m-0 max-w-[22ch] text-[clamp(2rem,4vw,3rem)] font-bold leading-[1.06] tracking-[-.035em]";
-const section = "border-t border-line py-[clamp(4.5rem,10vw,7.5rem)]";
-const label = "mb-1.5 block font-head text-[.85rem] font-semibold";
-const field = "h-12 w-full rounded-xl border border-line bg-bg px-4 font-body text-[1rem] text-ink transition-[border-color,box-shadow] placeholder:text-muted/70 hover:border-muted focus:border-lake focus:ring-4 focus:ring-lake/15 focus-visible:outline-none";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Same order as the province list in functions/waitlist.js.
+// Same list as PROVINCES in functions/waitlist.js.
 const PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT", "outside"];
-const PERK_ICONS = [SparkIcon, ChatIcon, MailIcon];
+const FIELDS = ["firstName", "email", "province", "consent"];
+const NIGHT = "#030609";
+const COUNT_REFRESH_MS = 30_000;
+
+const label = "mb-1.5 block font-body text-[.86rem] font-medium text-[#C3D2DC]";
+const field = "h-12 w-full rounded-xl border bg-white/[.04] px-4 font-body text-[1rem] text-white transition-[border-color,box-shadow] placeholder:text-white/35 hover:border-white/30 focus:border-[#009DC4] focus:ring-4 focus:ring-[#009DC4]/20 focus-visible:outline-none";
+const fieldBorder = (bad) => (bad ? "border-[#FF8F9E]" : "border-white/15");
+const errorText = "m-0 mt-1.5 font-body text-[.84rem] leading-snug text-[#FF9AA8]";
 
 // ---------- Page ----------
 export default function Waitlist() {
-  const { s } = useLang();
+  const { s, lang } = useLang();
   const w = s.waitlist;
   usePageTitle(w.pageTitle);
-  const emailRef = useRef(null);
-  const toForm = () => {
-    document.getElementById("join")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
-    emailRef.current?.focus({ preventScroll: true });
-  };
+  useNightChrome();
+  const [count, refreshCount] = useWaitlistCount();
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   return (
-    <>
-      <SiteHeader />
-      <main className="-mt-16">
-        <section className="relative overflow-hidden pt-[calc(4rem+clamp(3rem,8vw,5.5rem))] pb-[clamp(4rem,9vw,6.5rem)]">
-          <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-          <div aria-hidden="true" className="pointer-events-none absolute top-24 -right-40 size-[560px] rounded-full bg-lake/15 blur-[120px]" />
-          <div className={`${wrap} relative grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16`}>
-            <div className="animate-rise">
-              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 py-1.5 pr-4 pl-3 font-head text-[.82rem] font-medium text-muted backdrop-blur">
-                <span className="relative flex size-2"><span className="absolute inset-0 animate-ping rounded-full bg-lake/60 motion-reduce:hidden" /><span className="relative size-2 rounded-full bg-lake" /></span>
-                {w.badge}
-              </span>
-              <h1 className="mt-7 mb-6 max-w-[15ch] text-[clamp(2.6rem,6vw,4.5rem)] font-bold leading-[1] tracking-[-.045em]">{w.title}</h1>
-              <p className="m-0 max-w-[52ch] text-[clamp(1.05rem,1.6vw,1.18rem)] leading-[1.7] text-muted">{w.lead}</p>
-              <ul className="mt-8 mb-0 list-none space-y-3 p-0">
-                {w.points.map((p) => (
-                  <li key={p} className="flex items-center gap-3 text-[.98rem]">
-                    <span className="grid size-6 flex-none place-items-center rounded-full bg-lake-soft text-lake"><CheckIcon className="i size-3.5" /></span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div id="join" className="animate-rise scroll-mt-24 [animation-delay:.2s]">
-              <JoinCard w={w} provinces={w.provinces} emailRef={emailRef} />
-            </div>
-          </div>
-        </section>
+    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-[#030609] bg-[linear-gradient(180deg,#030609_0%,#050C14_28%,#0A1E30_62%,#0C2438_100%)] font-body text-[#E6EEF3] [--focus:#4CC6E4]">
+      <div className="aurora -z-10" aria-hidden="true" />
 
-        <section className={`${section} bg-surface`}>
-          <div className={wrap}>
-            <p className={eyebrow}>{w.perks.eyebrow}</p>
-            <h2 className={h2}>{w.perks.title}</h2>
-            <div className="mt-14 grid gap-5 md:grid-cols-3">
-              {w.perks.items.map(([title, text], i) => ({ Icon: PERK_ICONS[i], title, text })).map(({ Icon, title, text }) => (
-                <article key={title} className="rounded-2xl border border-line bg-bg p-7">
-                  <span className="grid size-11 place-items-center rounded-xl bg-lake-soft text-lake"><Icon /></span>
-                  <h3 className="mt-6 mb-2 text-[1.15rem] font-semibold tracking-[-.015em]">{title}</h3>
-                  <p className="m-0 text-[.95rem] leading-relaxed text-muted">{text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
+      <header className="flex items-center justify-between gap-4 px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 sm:pt-6">
+        <div className="inline-flex items-center gap-2.5" aria-label="ARTICX" role="img">
+          <img src="/favicon.svg" alt="" className="size-9 rounded-[10px] ring-1 ring-white/10 sm:size-10" />
+          <span aria-hidden="true" className="font-body text-[1.3rem] font-extrabold tracking-[.04em] text-white sm:text-[1.45rem]">ARTICX</span>
+        </div>
+        <LangSwitch label={w.langLabel} />
+      </header>
 
-        <section className={section}>
-          <div className={wrap}>
-            <p className={eyebrow}>{w.steps.eyebrow}</p>
-            <h2 className={h2}>{w.steps.title}</h2>
-            <ol className="relative mt-14 grid list-none gap-10 p-0 md:grid-cols-3 md:gap-8">
-              <span aria-hidden="true" className="absolute top-5 right-[16%] left-[16%] hidden h-px bg-line md:block" />
-              {w.steps.items.map(([title, text], i) => (
-                <li key={title} className="relative md:text-center">
-                  <span className="relative grid size-10 place-items-center rounded-full border border-line bg-surface font-mono text-[.9rem] font-semibold text-lake md:mx-auto">{i + 1}</span>
-                  <h3 className="mt-5 mb-2 text-[1.1rem] font-semibold">{title}</h3>
-                  <p className="m-0 text-[.95rem] leading-relaxed text-muted md:mx-auto md:max-w-[30ch]">{text}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
+      <main className="mx-auto flex w-[min(900px,100%-2rem)] flex-1 flex-col items-center pt-[clamp(1.75rem,5vh,2.5rem)] pb-10 sm:pt-[clamp(2.5rem,10vh,6rem)] text-center sm:pb-14">
+        <p className="m-0 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.05] px-4 py-1.5 font-body text-[.84rem] font-medium text-[#C3D2DC]">
+          <span className="size-1.5 rounded-full bg-[#3DDC97]" aria-hidden="true" />
+          {w.pill}
+        </p>
 
-        <section className={`${section} bg-surface`}>
-          <div className={`${wrap} grid gap-12 lg:grid-cols-[.8fr_1.2fr]`}>
-            <div>
-              <p className={eyebrow}>{w.faq.eyebrow}</p>
-              <h2 className={h2}>{w.faq.title}</h2>
-            </div>
-            <div className="faq divide-y divide-line border-y border-line">
-              {w.faq.items.map(([q, a]) => (
-                <details key={q}>
-                  <summary className="flex cursor-pointer items-center justify-between gap-6 py-5 font-head text-[1.02rem] font-semibold">
-                    {q}
-                    <span className="plus grid size-7 flex-none place-items-center rounded-full border border-line text-muted" aria-hidden="true">+</span>
-                  </summary>
-                  <p className="mt-0 mb-5 max-w-[62ch] pr-10 text-[.97rem] leading-relaxed text-muted">{a}</p>
-                </details>
-              ))}
-            </div>
-          </div>
-        </section>
+        <h1 className="mt-5 mb-4 max-w-[24ch] sm:mt-6 sm:mb-5 font-body text-[clamp(2rem,5.6vw,3.5rem)] font-extrabold leading-[1.1] tracking-[-.025em] text-white text-balance">
+          <Highlight text={w.title} word={w.titleRed} className="text-[#F0303F]" />
+        </h1>
+        <p className="m-0 max-w-[68ch] text-[clamp(.98rem,1.8vw,1.13rem)] leading-[1.65] text-pretty text-[#B5C5D0]">
+          {w.intro[0]}<br className="max-sm:hidden" /> {w.intro[1]}
+        </p>
 
-        <section className="border-t border-line bg-ink py-[clamp(4rem,9vw,6rem)] text-surface">
-          <div className={`${wrap} flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center`}>
-            <div>
-              <p className="m-0 mb-4 inline-flex items-center gap-2 font-head text-[.78rem] font-semibold tracking-[.12em] uppercase opacity-70"><Leaf size={13} />{w.badge}</p>
-              <h2 className="m-0 max-w-[22ch] text-[clamp(1.9rem,4vw,2.9rem)] font-bold leading-[1.06] tracking-[-.035em]">{w.title}</h2>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button type="button" onClick={toForm} className={`${btn("ghost", "lg")} border-transparent`}>{w.form.submit}</button>
-              <Link to="/chat" className={`${btn("quiet", "lg")} text-surface ring-1 ring-surface/25 hover:bg-surface/10`}>{w.done.tryNow}</Link>
-            </div>
+        {/* Frosted glass: blue maple leaves sit behind the panel, crisp where they peek out, blurred through it */}
+        <div className="relative isolate mt-8 w-full sm:mt-10">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+            <GlassLeaf className="absolute -top-7 sm:-top-[clamp(3.5rem,7vw,5.5rem)] -left-[clamp(1.5rem,6vw,5rem)] size-[clamp(8rem,22vw,13rem)] -rotate-12 opacity-85" from="#A8E6F5" to="#009DC4" />
+            <GlassLeaf className="absolute top-[30%] -right-[clamp(1.25rem,4.5vw,3.5rem)] size-[clamp(4.5rem,10vw,7rem)] rotate-[18deg] opacity-80" from="#A8E6F5" to="#33B6D6" />
+            <GlassLeaf className="absolute -right-[clamp(.5rem,2vw,1.5rem)] -bottom-[clamp(1.5rem,4vw,3rem)] size-[clamp(5rem,12vw,8rem)] -rotate-[20deg] opacity-75" from="#7FD6EC" to="#00789A" />
           </div>
-        </section>
+          <div className="rounded-3xl bg-[#0B1A26]/35 p-[clamp(1.25rem,3.5vw,2rem)] text-left shadow-[0_40px_100px_-40px_rgba(0,0,0,.8)] backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[28px]">
+            <JoinForm w={w} lang={lang} onJoined={refreshCount} />
+          </div>
+        </div>
+
+        {count > 0 && (
+          <p className="mt-7 mb-0 inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#08121B]/70 px-4 py-1.5 text-[.88rem] font-medium text-white backdrop-blur" aria-live="polite">
+            <span className="relative flex size-2" aria-hidden="true">
+              <span className="absolute inset-0 rounded-full bg-[#3DDC97]/70 motion-safe:animate-ping" />
+              <span className="relative size-2 rounded-full bg-[#3DDC97]" />
+            </span>
+            {w.count(count, new Intl.NumberFormat(s.locale).format(count))}
+          </p>
+        )}
+        <p className="mt-5 mb-0 max-w-[36ch] text-center text-[.84rem] leading-relaxed text-balance text-[#C3D2DC] sm:max-w-none sm:whitespace-nowrap">
+          <LockIcon className="i mr-1.5 inline size-3.5 -translate-y-px align-middle" />
+          {w.privacy}{" "}
+          <button type="button" onClick={() => setNoticeOpen(true)} aria-haspopup="dialog"
+            className="cursor-pointer border-0 bg-transparent p-0 font-body text-[inherit] text-white underline decoration-white/40 underline-offset-[3px] hover:decoration-white max-sm:mt-1 max-sm:block max-sm:w-full">
+            {w.notice.link}
+          </button>
+        </p>
       </main>
-      <SiteFooter />
-    </>
+
+      <footer className="px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center text-[.8rem] text-[#9FB2C0]">
+        <p className="m-0">{w.copyright}</p>
+      </footer>
+
+      <PrivacyNotice n={w.notice} open={noticeOpen} onClose={() => setNoticeOpen(false)} />
+    </div>
   );
 }
 
 // ---------- Form ----------
-function JoinCard({ w, provinces, emailRef }) {
-  const { lang } = useLang();
+function JoinForm({ w, lang, onJoined }) {
   const f = w.form;
   const id = useId();
-  const [form, setForm] = useState({ email: "", firstName: "", province: "", interests: [], consent: false, website: "" });
+  const refs = { firstName: useRef(null), email: useRef(null), province: useRef(null), consent: useRef(null) };
+  const doneRef = useRef(null);
+  const [form, setForm] = useState({ firstName: "", email: "", province: "", consent: false, website: "" });
+  const [errors, setErrors] = useState({}); // field -> key of f.errors
+  const [formError, setFormError] = useState(null); // throttled | server | network
   const [status, setStatus] = useState("idle"); // idle | sending | done
-  const [error, setError] = useState(null); // key of f.errors
-  const set = (k, v) => { setForm((x) => ({ ...x, [k]: v })); setError(null); };
-  const toggle = (i) => set("interests", form.interests.includes(i) ? form.interests.filter((x) => x !== i) : [...form.interests, i]);
+
+  const set = (k, v) => {
+    setForm((x) => ({ ...x, [k]: v }));
+    setErrors((e) => (e[k] ? { ...e, [k]: undefined } : e));
+    setFormError(null);
+  };
+  const showErrors = (errs) => {
+    setErrors(errs);
+    refs[FIELDS.find((k) => errs[k])]?.current?.focus();
+  };
+
+  useEffect(() => { if (status === "done") doneRef.current?.focus(); }, [status]);
 
   async function submit(e) {
     e.preventDefault();
-    const email = form.email.trim();
-    if (!EMAIL_RE.test(email)) { setError("email"); emailRef.current?.focus(); return; }
-    if (!form.consent) { setError("consent"); return; }
+    if (status === "sending") return;
+    const data = { ...form, firstName: form.firstName.trim(), email: form.email.trim() };
+    const errs = {};
+    if (!data.firstName) errs.firstName = "firstName";
+    if (!EMAIL_RE.test(data.email)) errs.email = "email";
+    if (!PROVINCES.includes(data.province)) errs.province = "province";
+    if (!data.consent) errs.consent = "consent";
+    if (Object.keys(errs).length) return showErrors(errs);
+
     setStatus("sending");
+    setFormError(null);
     try {
       const r = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, email, lang }),
+        body: JSON.stringify({ ...data, language: lang }),
       });
-      if (r.ok) { setStatus("done"); return; }
+      if (r.ok) {
+        setForm(data);
+        setStatus("done");
+        onJoined();
+        return;
+      }
       const d = await r.json().catch(() => ({}));
-      setError(f.errors[d.error] ? d.error : "server");
+      if (FIELDS.includes(d.error)) showErrors({ [d.error]: d.error });
+      else setFormError(f.errors[d.error] ? d.error : "server");
     } catch {
-      setError("network");
+      setFormError("network");
     }
     setStatus("idle");
   }
 
-  const card = "rounded-[22px] border border-line bg-surface p-[clamp(1.5rem,4vw,2.25rem)] shadow-[0_30px_80px_-30px_rgba(16,32,41,.35)]";
-
   if (status === "done") {
     return (
-      <div className={card} role="status">
-        <span className="grid size-14 place-items-center rounded-2xl bg-lake-soft text-lake"><CheckIcon className="i size-7" /></span>
-        <h2 className="mt-6 mb-2 text-[1.75rem] font-bold tracking-[-.03em]">{w.done.title}</h2>
-        <p className="m-0 text-[1rem] leading-relaxed text-muted">{w.done.text(form.email.trim())}</p>
-        <div className="mt-7 border-t border-line pt-6">
-          <p className="m-0 mb-3 text-[.92rem] text-muted">{w.done.share}</p>
-          <CopyLink w={w} />
-        </div>
-        <div className="mt-7 flex flex-wrap items-center gap-3">
-          <Link to="/chat" className={btn("primary", "md")}>{w.done.tryNow}</Link>
-          <button type="button" className={btn("quiet", "md")} onClick={() => { setForm((x) => ({ ...x, email: "", consent: false })); setStatus("idle"); }}>
-            {w.done.again}
-          </button>
-        </div>
+      <div className="py-3 text-center sm:py-4" role="status">
+        <span className="mx-auto grid size-14 place-items-center rounded-full bg-[#009DC4]/15 text-[#009DC4] ring-1 ring-[#009DC4]/40">
+          <CheckIcon className="i size-7" />
+        </span>
+        <h2 ref={doneRef} tabIndex={-1} className="mt-5 mb-3 font-body text-[clamp(1.4rem,3.4vw,1.9rem)] font-bold leading-tight tracking-[-.015em] text-white focus:outline-none">
+          {w.done.title(form.firstName)}
+        </h2>
+        <p className="m-0 text-[1rem] text-[#B5C5D0]">
+          {w.done.text} <strong className="font-semibold break-all text-white">{form.email}</strong>
+        </p>
+        <p className="mt-2 mb-0 text-[.88rem] text-[#8FA4B3]">{w.done.note}</p>
+        <button type="button" onClick={() => { setForm({ firstName: "", email: "", province: "", consent: false, website: "" }); setStatus("idle"); }}
+          className="mt-6 cursor-pointer rounded-full border border-white/15 bg-transparent px-5 py-2.5 font-body text-[.9rem] font-medium text-[#C3D2DC] hover:border-white/35 hover:text-white">
+          {w.done.again}
+        </button>
       </div>
     );
   }
 
   const sending = status === "sending";
-  return (
-    <form className={card} onSubmit={submit} noValidate aria-describedby={error ? `${id}-err` : undefined}>
-      <h2 className="m-0 text-[1.5rem] font-bold tracking-[-.025em]">{f.title}</h2>
-      <p className="mt-1 mb-6 text-[.95rem] text-muted">{f.subtitle}</p>
+  const err = (k) => errors[k] && <p id={`${id}-${k}-err`} className={errorText}>{f.errors[errors[k]]}</p>;
+  const describedBy = (k) => (errors[k] ? `${id}-${k}-err` : undefined);
 
-      <div className="space-y-4">
+  return (
+    <form onSubmit={submit} noValidate aria-label={f.label}>
+      <div className="grid gap-4 md:grid-cols-[1fr_1.35fr_1.25fr]">
+        <div>
+          <label htmlFor={`${id}-firstName`} className={label}>{f.firstName}</label>
+          <input ref={refs.firstName} id={`${id}-firstName`} name="given-name" autoComplete="given-name" autoCapitalize="words" maxLength={60} required
+            placeholder={f.firstNamePlaceholder} value={form.firstName} onChange={(e) => set("firstName", e.target.value)}
+            aria-invalid={!!errors.firstName || undefined} aria-describedby={describedBy("firstName")}
+            className={`${field} ${fieldBorder(errors.firstName)}`} />
+          {err("firstName")}
+        </div>
         <div>
           <label htmlFor={`${id}-email`} className={label}>{f.email}</label>
-          <input ref={emailRef} id={`${id}-email`} type="email" inputMode="email" autoComplete="email" required
+          <input ref={refs.email} id={`${id}-email`} name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={254} required
             placeholder={f.emailPlaceholder} value={form.email} onChange={(e) => set("email", e.target.value)}
-            aria-invalid={error === "email" || undefined} className={`${field} ${error === "email" ? "border-red" : ""}`} />
+            aria-invalid={!!errors.email || undefined} aria-describedby={describedBy("email")}
+            className={`${field} ${fieldBorder(errors.email)}`} />
+          {err("email")}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor={`${id}-name`} className={label}>{f.firstName} <span className="font-normal text-muted">({f.optional})</span></label>
-            <input id={`${id}-name`} autoComplete="given-name" maxLength={60} value={form.firstName}
-              onChange={(e) => set("firstName", e.target.value)} className={field} />
+        <div>
+          <label htmlFor={`${id}-province`} className={label}>{f.province}</label>
+          <div className="relative">
+            <select ref={refs.province} id={`${id}-province`} name="province" autoComplete="address-level1" required
+              value={form.province} onChange={(e) => set("province", e.target.value)}
+              aria-invalid={!!errors.province || undefined} aria-describedby={describedBy("province")}
+              className={`${field} ${fieldBorder(errors.province)} cursor-pointer appearance-none pr-10 ${form.province ? "" : "text-white/45"}`}>
+              <option value="" disabled className="bg-[#0B1A26] text-white/60">{f.provincePlaceholder}</option>
+              {PROVINCES.map((p) => <option key={p} value={p} className="bg-[#0B1A26] text-white">{w.provinces[p]}</option>)}
+            </select>
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="i pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-white/60"><path d="m6 9 6 6 6-6" /></svg>
           </div>
-          <div>
-            <label htmlFor={`${id}-prov`} className={label}>{f.province} <span className="font-normal text-muted">({f.optional})</span></label>
-            <div className="relative">
-              <select id={`${id}-prov`} value={form.province} onChange={(e) => set("province", e.target.value)}
-                className={`${field} cursor-pointer appearance-none pr-10 ${form.province ? "" : "text-muted"}`}>
-                <option value="">{f.provincePlaceholder}</option>
-                {PROVINCES.map((p) => <option key={p} value={p}>{provinces[p]}</option>)}
-              </select>
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="i pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-muted"><path d="m6 9 6 6 6-6" /></svg>
-            </div>
-          </div>
+          {err("province")}
         </div>
-
-        <fieldset className="m-0 border-0 p-0">
-          <legend className={label}>{f.interestsLabel} <span className="font-normal text-muted">({f.optional})</span></legend>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(f.interests).map(([key, text]) => {
-              const on = form.interests.includes(key);
-              return (
-                <label key={key} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 font-head text-[.85rem] font-medium transition-colors has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${on ? "border-lake bg-lake-soft text-lake" : "border-line text-ink hover:border-muted"}`}>
-                  <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(key)} />
-                  {on && <CheckIcon className="i size-3.5" />}
-                  {text}
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        {/* Honeypot for bots: hidden from people and screen readers. */}
-        <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
-          <label>Website <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => set("website", e.target.value)} /></label>
-        </div>
-
-        <label className={`flex cursor-pointer gap-3 rounded-xl border p-3.5 text-[.88rem] leading-snug transition-colors ${error === "consent" ? "border-red" : "border-line hover:border-muted"}`}>
-          <input type="checkbox" checked={form.consent} onChange={(e) => set("consent", e.target.checked)}
-            aria-invalid={error === "consent" || undefined} className="mt-0.5 size-[18px] flex-none cursor-pointer accent-[var(--lake)]" />
-          <span>{f.consent}</span>
-        </label>
       </div>
 
-      <p id={`${id}-err`} role="alert" className="m-0 mt-4 text-[.9rem] font-medium text-red empty:hidden">{error ? f.errors[error] : ""}</p>
+      {/* Honeypot for bots: hidden from people and screen readers. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label>Website <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => set("website", e.target.value)} /></label>
+      </div>
 
-      <button type="submit" disabled={sending} className={`${btn("primary", "lg")} mt-5 w-full disabled:cursor-wait disabled:opacity-70`}>
-        {sending ? f.sending : f.submit}
-        {!sending && <span aria-hidden="true">→</span>}
-      </button>
-      <p className="mt-4 mb-0 flex items-start gap-2 text-[.82rem] leading-relaxed text-muted">
-        <LockIcon className="i mt-0.5 size-3.5" />
-        <span>{f.privacy[0]}<Link to="/privacy">{f.privacy[1]}</Link>{f.privacy[2]}</span>
-      </p>
+      <div className="mt-6 flex flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-8">
+        <div className="min-w-0 md:flex-1">
+          <label className="flex cursor-pointer items-start gap-3 md:items-center text-[.9rem] leading-snug text-[#D3DEE5]">
+            <input ref={refs.consent} type="checkbox" name="consent" checked={form.consent} onChange={(e) => set("consent", e.target.checked)}
+              aria-invalid={!!errors.consent || undefined} aria-describedby={describedBy("consent")}
+              className={`size-5 flex-none cursor-pointer rounded accent-[#009DC4] ${errors.consent ? "outline-2 outline-offset-2 outline-[#FF8F9E]" : ""}`} />
+            <span>{f.consent}</span>
+          </label>
+          {errors.consent && <p id={`${id}-consent-err`} className={`${errorText} pl-8`}>{f.errors.consent}</p>}
+        </div>
+        <button type="submit" disabled={sending}
+          className="inline-flex h-[54px] w-full flex-none cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-[#009DC4] px-8 font-body text-[1rem] font-bold text-white transition-[background,transform] hover:bg-[#0089AB] active:scale-[.98] disabled:cursor-wait disabled:opacity-75 md:w-auto">
+          {sending ? f.sending : f.submit}
+          {!sending && <span aria-hidden="true">→</span>}
+        </button>
+      </div>
+
+      <p role="alert" className="m-0 mt-4 font-body text-[.9rem] font-medium text-[#FF9AA8] empty:hidden">{formError ? f.errors[formError] : ""}</p>
     </form>
   );
 }
 
-function CopyLink({ w }) {
-  const url = `${location.origin}/waitlist`;
-  const [copied, setCopied] = useState(false);
-  const copy = () => navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }, () => {});
+// ---------- Pieces ----------
+// The text with one word picked out (the red "Canadian" in the headline).
+function Highlight({ text, word, className }) {
+  const i = word ? text.indexOf(word) : -1;
+  if (i < 0) return text;
+  return <>{text.slice(0, i)}<span className={className}>{word}</span>{text.slice(i + word.length)}</>;
+}
+
+// What happens to waitlist sign-ups, in a popup so people never leave the form.
+// Native <dialog>: Escape closes it and focus stays inside while it's open.
+function PrivacyNotice({ n, open, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) {
+      d.showModal();
+      document.documentElement.style.overflow = "hidden";
+    } else if (!open && d.open) d.close();
+    return () => { document.documentElement.style.overflow = ""; };
+  }, [open]);
+
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-line bg-bg p-1.5 pl-4">
-      <span className="min-w-0 flex-1 truncate font-mono text-[.85rem] text-muted">{url.replace(/^https?:\/\//, "")}</span>
-      <button type="button" onClick={copy} className={btn("ghost", "sm")} aria-live="polite">
-        {copied ? <CheckIcon className="i size-4 text-lake" /> : <CopyIcon className="i size-4" />}
-        {copied ? w.done.copied : w.done.copy}
-      </button>
+    <dialog ref={ref} onClose={onClose} aria-labelledby="notice-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="m-auto max-h-[min(86dvh,720px)] w-[min(560px,calc(100%-2rem))] overflow-hidden rounded-[22px] border border-white/12 bg-[#0B1A26] p-0 text-[#D3DEE5] shadow-[0_40px_120px_-30px_rgba(0,0,0,.9)] backdrop:bg-[#04090E]/75 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:w-full max-sm:max-w-full max-sm:rounded-b-none">
+      <div className="flex max-h-[inherit] flex-col">
+        <div className="flex items-center justify-between gap-4 border-b border-white/10 px-6 py-4">
+          <h2 id="notice-title" className="m-0 font-body text-[1.15rem] font-bold text-white">{n.title}</h2>
+          <button type="button" onClick={onClose} aria-label={n.close}
+            className="grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 bg-white/[.06] text-white/80 hover:bg-white/[.12] hover:text-white">
+            <svg viewBox="0 0 24 24" className="i size-4" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto overscroll-contain px-6 pt-4 pb-6 text-[.93rem] leading-relaxed">
+          <p className="m-0 text-[#B5C5D0]">{n.intro}</p>
+          {n.sections.map(([h, text]) => (
+            <section key={h} className="mt-5">
+              <h3 className="m-0 mb-1 font-body text-[.95rem] font-bold text-white">{h}</h3>
+              <p className="m-0">{text}</p>
+            </section>
+          ))}
+          <p className="mt-6 mb-0 text-[.82rem] text-[#8FA4B3]">{n.updated}</p>
+        </div>
+        <div className="border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button type="button" onClick={onClose}
+            className="h-11 w-full cursor-pointer rounded-full border-0 bg-[#009DC4] font-body text-[.95rem] font-bold text-white hover:bg-[#0089AB]">
+            {n.done}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+// A filled maple leaf in a soft blue gradient, for the shapes behind the glass form panel.
+function GlassLeaf({ className, from, to }) {
+  const id = `leaf${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <svg viewBox={LEAF_VIEWBOX} className={className}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={from} />
+          <stop offset="1" stopColor={to} />
+        </linearGradient>
+      </defs>
+      <path fill={`url(#${id})`} d={LEAF_PATH} />
+    </svg>
+  );
+}
+
+function LangSwitch({ label: groupLabel }) {
+  const { lang, setLang } = useLang();
+  return (
+    <div role="group" aria-label={groupLabel} className="inline-flex rounded-full border border-white/15 bg-white/[.05] p-1 backdrop-blur">
+      {["en", "fr"].map((l) => (
+        <button key={l} type="button" lang={l} aria-pressed={lang === l} onClick={() => setLang(l)}
+          aria-label={l === "en" ? "English" : "Français"}
+          className={`h-8 min-w-11 cursor-pointer rounded-full border-0 px-3 font-body text-[.78rem] font-bold tracking-[.06em] transition-colors ${lang === l ? "bg-[#009DC4] text-white" : "bg-transparent text-white/70 hover:text-white"}`}>
+          {l.toUpperCase()}
+        </button>
+      ))}
     </div>
   );
+}
+
+// The page is always night-dark, whatever the site theme: match the page behind it
+// (overscroll, iOS safe areas) and the browser bar while it's open.
+function useNightChrome() {
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const prev = [document.body.style.backgroundColor, meta?.content];
+    document.body.style.backgroundColor = NIGHT;
+    if (meta) meta.content = NIGHT;
+    return () => {
+      document.body.style.backgroundColor = prev[0];
+      if (meta) meta.content = prev[1];
+    };
+  }, []);
+}
+
+// stats/waitlist.count (kept by the countWaitlist function), read through the Firestore REST
+// API so this page doesn't load the Firebase SDK. Refreshes while the tab is visible.
+// null until it loads, or if it can't be read; the page then just hides the counter.
+function useWaitlistCount() {
+  const [count, setCount] = useState(null);
+  const load = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    const url = fetch("/__/firebase/init.json")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((c) => `https://firestore.googleapis.com/v1/projects/${c.projectId}/databases/(default)/documents/stats/waitlist?key=${c.apiKey}`);
+    load.current = () => url
+      .then((u) => fetch(u, { cache: "no-store" }))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const n = Number(d?.fields?.count?.integerValue);
+        if (alive && Number.isFinite(n)) setCount(n);
+      })
+      .catch(() => {});
+    load.current();
+    const t = setInterval(() => { if (document.visibilityState === "visible") load.current(); }, COUNT_REFRESH_MS);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  // After a sign-up the trigger needs a moment to update the count.
+  const refresh = () => { setTimeout(() => load.current?.(), 2500); setTimeout(() => load.current?.(), 7000); };
+  return [count, refresh];
 }

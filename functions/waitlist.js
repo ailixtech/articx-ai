@@ -1,24 +1,27 @@
 /**
  * Waitlist sign-ups from /waitlist (POST /api/waitlist, a Hosting rewrite, so same origin).
  *
- * One document per email address: waitlist/{sha256(email)} with { email, firstName,
- * province, interests, lang, consent, createdAt, updatedAt }. Browsers can't read or
- * write the collection (firestore.rules); only this function and the admin panel can.
- * Signing up again with the same email updates the details and keeps createdAt,
- * and the reply is the same either way, so the form can't be used to test addresses.
+ * One document per email address: waitlist/{sha256(lowercased email)} with { firstName, email,
+ * province, language, consent, consentAt, consentVersion, source, status, createdAt }.
+ * Browsers can't read or write the collection (firestore.rules); only this function and
+ * the admin panel can. A second sign-up with the same email changes nothing, and the
+ * reply is the same either way, so the form can't be used to test addresses.
+ *
+ * countWaitlist keeps stats/waitlist.count (the only publicly readable doc) in step.
  */
 const { onRequest } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { createHash } = require("node:crypto");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PER_IP_HOUR = 10;
-// Keep in step with waitlist.provinces and waitlist.form.interests in web/src/i18n.
+// Keep in step with PROVINCES in web/src/pages/Waitlist.jsx and waitlist.provinces in web/src/i18n.
 const PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT", "outside"];
-const INTERESTS = ["plans", "mobile", "models", "teams"];
 // Bump when the consent sentence in web/src/i18n (waitlist.form.consent) changes.
-const CONSENT_VERSION = "2026-10-03";
+const CONSENT_VERSION = "2026-10-04";
+const SOURCE = "waitlist-v2";
 
 const sha = (s) => createHash("sha256").update(s).digest("hex");
 const clientIp = (req) => (req.get("x-forwarded-for") || "").split(",")[0].trim() || req.ip || "unknown";
@@ -46,34 +49,54 @@ exports.waitlist = onRequest(
     // Honeypot: people never see this field, simple bots fill it in. Pretend it worked.
     if (str(b.website, 200)) return res.json({ ok: true });
 
+    const firstName = str(b.firstName, 60);
     const email = str(b.email, 254).toLowerCase();
-    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "email" });
-    if (b.consent !== true) return res.status(400).json({ error: "consent" });
-
     const province = PROVINCES.includes(b.province) ? b.province : "";
-    const interests = Array.isArray(b.interests) ? INTERESTS.filter((i) => b.interests.includes(i)) : [];
+    if (!firstName) return res.status(400).json({ error: "firstName" });
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "email" });
+    if (!province) return res.status(400).json({ error: "province" });
+    if (b.consent !== true) return res.status(400).json({ error: "consent" });
 
     try {
       if (!(await underLimit(clientIp(req)))) return res.status(429).json({ error: "throttled" });
       const db = getFirestore();
       const ref = db.doc(`waitlist/${sha(email)}`);
       await db.runTransaction(async (tx) => {
-        const exists = (await tx.get(ref)).exists;
-        tx.set(ref, {
+        if ((await tx.get(ref)).exists) return;
+        tx.create(ref, {
+          firstName,
           email,
-          firstName: str(b.firstName, 60),
           province,
-          interests,
-          lang: b.lang === "fr" ? "fr" : "en",
-          consent: { email: true, version: CONSENT_VERSION, at: FieldValue.serverTimestamp() },
-          updatedAt: FieldValue.serverTimestamp(),
-          ...(exists ? {} : { createdAt: FieldValue.serverTimestamp(), status: "waiting" }),
-        }, { merge: true });
+          language: b.language === "fr" ? "fr" : "en",
+          consent: true,
+          consentAt: FieldValue.serverTimestamp(),
+          consentVersion: CONSENT_VERSION,
+          source: SOURCE,
+          status: "waiting",
+          createdAt: FieldValue.serverTimestamp(),
+        });
       });
       return res.json({ ok: true });
     } catch (e) {
       logger.error("Waitlist sign-up failed", { error: e.message });
       return res.status(500).json({ error: "server" });
     }
+  }
+);
+
+// Adds each new sign-up to stats/waitlist.count. The first run (no stats doc yet) starts
+// the count from the collection's size, so sign-ups made before this trigger are included.
+exports.countWaitlist = onDocumentCreated(
+  { document: "waitlist/{id}", region: "northamerica-northeast2", maxInstances: 3 },
+  async () => {
+    const db = getFirestore();
+    const ref = db.doc("stats/waitlist");
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const count = snap.exists
+        ? FieldValue.increment(1)
+        : (await tx.get(db.collection("waitlist").count())).data().count;
+      tx.set(ref, { count, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    });
   }
 );

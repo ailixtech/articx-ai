@@ -88,6 +88,7 @@ export default function AuthScreen({ fb, account, view, setView, pending }) {
   useEffect(() => {
     if (!step) return;
     setMessage(view.error ? { text: view.error } : null);
+    if (view.email) setEmail(view.email); // picked in the "Welcome back" chooser
     if (step === "code" || step === "reset-code") setCode("");
     if (step === "profile") {
       setFirstName((v) => v || (fb.auth.currentUser?.displayName || "").trim().split(/\s+/)[0] || "");
@@ -218,7 +219,7 @@ export default function AuthScreen({ fb, account, view, setView, pending }) {
   return (
     <section aria-labelledby="auth-title" className="fixed inset-0 z-60 flex flex-col overflow-y-auto bg-surface text-ink">
       <header className="flex items-center justify-between px-4 py-[14px]">
-        <Brand />
+        <Brand icon={false} />
         <div className="flex items-center gap-2">
           <LangToggle />
           <button type="button" className={iconBtn} aria-label={A.close} onClick={leave}><CloseIcon /></button>
@@ -276,7 +277,7 @@ export default function AuthScreen({ fb, account, view, setView, pending }) {
             </>
           )}
 
-          {message && <p role="alert" className={`mt-1 mb-[.9rem] text-[.9rem] ${message.ok ? "text-lake" : "text-red"}`}>{message.text}</p>}
+          {message && <p role="alert" className={`mt-1 mb-[.9rem] text-[.9rem] ${message.ok ? "text-lake-deep" : "text-red"}`}>{message.text}</p>}
           <button type="submit" disabled={busy}
             className={`${pill} relative mt-2 border-transparent bg-ink text-surface hover:brightness-125 disabled:cursor-progress disabled:opacity-60`}>
             <span className={busy ? "invisible" : ""}>{st.button}</span>

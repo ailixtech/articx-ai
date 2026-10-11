@@ -44,7 +44,7 @@ export default function SharePage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 flex min-h-[60px] items-center gap-2 border-b border-line bg-bg/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur">
-        <Brand compact />
+        <Brand icon={false} />
         <div className="ml-auto flex items-center gap-2">
           <ThemeSwitch pref={pref} onChange={setPref} />
           <Link to="/chat" className={btn("primary", "sm")}>{t.cta}</Link>
@@ -56,7 +56,7 @@ export default function SharePage() {
         {state.status === "ready" && (
           <>
             <div className="mx-auto mb-8 max-w-[760px] border-b border-line pb-4">
-              <p className="m-0 mb-1 font-head text-[.78rem] font-semibold tracking-[.1em] text-lake uppercase">{t.label}</p>
+              <p className="m-0 mb-1 font-head text-[.78rem] font-semibold tracking-[.1em] text-lake-deep uppercase">{t.label}</p>
               <h1 className="m-0 text-[clamp(1.4rem,3vw,1.9rem)] font-bold tracking-[-.02em]">{state.title}</h1>
             </div>
             {state.messages.map((m, i) => (m.role === "user"

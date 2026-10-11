@@ -56,7 +56,7 @@ export default function ThemeSwitch({ pref, onChange, labelled = false, classNam
               className="flex w-full cursor-pointer items-center gap-[.6rem] rounded-[8px] border-0 bg-transparent px-[.6rem] py-[.5rem] text-left font-head text-[.88rem] text-ink hover:bg-bg-2">
               <Icon className="i size-[17px] text-muted" />
               <span className="flex-1">{t[id]}</span>
-              {pref === id && <CheckIcon className="i size-[16px] text-lake" />}
+              {pref === id && <CheckIcon className="i size-[16px] text-lake-deep" />}
             </button>
           ))}
         </div>

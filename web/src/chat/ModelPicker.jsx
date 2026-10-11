@@ -47,12 +47,12 @@ export default function ModelPicker({ model, onChange, isGuest, onSignUp }) {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 font-head text-[.9rem] font-semibold text-ink">
                     {m.name}
-                    {m.id === CONFIG.defaultModel && <span className="rounded-full bg-lake-soft px-2 py-px text-[.7rem] font-semibold text-lake">{t.default}</span>}
+                    {m.id === CONFIG.defaultModel && <span className="rounded-full bg-lake-soft px-2 py-px text-[.7rem] font-semibold text-lake-deep">{t.default}</span>}
                   </span>
                   <span className="block text-[.82rem] leading-snug text-muted">{t.descriptions[m.id]}</span>
-                  {locked && <span className="mt-1 block text-[.8rem] font-semibold text-lake">{t.signUpToUse}</span>}
+                  {locked && <span className="mt-1 block text-[.8rem] font-semibold text-lake-deep">{t.signUpToUse}</span>}
                 </span>
-                {locked ? <LockIcon className="i mt-[3px] size-4 text-muted" /> : selected && <CheckIcon className="i mt-[3px] size-4 text-lake" />}
+                {locked ? <LockIcon className="i mt-[3px] size-4 text-muted" /> : selected && <CheckIcon className="i mt-[3px] size-4 text-lake-deep" />}
               </button>
             );
           })}

@@ -9,7 +9,7 @@ export class ModelError extends Error {
   }
 }
 
-export async function streamCompletion({ history, model, backend, cloudUrl, getToken, onToken, signal }) {
+export async function streamCompletion({ history, model, backend, cloudUrl, getToken, onToken, onSources, signal }) {
   let url, body;
   const headers = { "Content-Type": "application/json" };
   if (backend === "cloud") {
@@ -52,6 +52,7 @@ export async function streamCompletion({ history, model, backend, cloudUrl, getT
       let json;
       try { json = JSON.parse(data); } catch { continue; }
       if (json.error) throw new ModelError("stream", 0, json.error.message || String(json.error));
+      if (Array.isArray(json.sources)) { onSources?.(json.sources, !!json.searched); continue; }
       const tok = json.choices?.[0]?.delta?.content;
       if (typeof tok === "string" && tok) onToken(tok);
     }
@@ -69,6 +70,7 @@ export function friendlyError(e, backend, s) {
     if (backend === "mlx") return "Couldn't reach the MLX server at localhost:8080. Start it with: mlx_lm.server --model mlx-community/Qwen2.5-7B-Instruct-4bit --port 8080";
     return t.network;
   }
+  if (e.kind === "stream") return t.down;
   if (e.status === 401) return t.session;
   if (e.status === 403) return t.setup;
   if (e.status === 429) return e.code === "week_limit" ? t.weekly : e.code === "month_limit" ? t.monthly : t.daily;

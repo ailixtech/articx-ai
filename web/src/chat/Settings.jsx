@@ -245,7 +245,7 @@ function Billing({ t, lang, fb, user }) {
         </div>
         <ul className="m-0 mt-3 grid list-none gap-[.35rem] p-0 sm:grid-cols-2">
           {t.includes(CONFIG.limits).map((x) => (
-            <li key={x} className="flex items-center gap-2 text-[.86rem]"><CheckIcon className="i size-4 flex-none text-lake" />{x}</li>
+            <li key={x} className="flex items-center gap-2 text-[.86rem]"><CheckIcon className="i size-4 flex-none text-lake-deep" />{x}</li>
           ))}
         </ul>
       </div>

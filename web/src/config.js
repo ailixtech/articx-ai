@@ -22,6 +22,11 @@ export const CONFIG = {
       // Used only with local model servers in development; the server has its own copy.
       style: "Answer as briefly and precisely as possible: lead with the answer, use at most a few short sentences or a short list, and skip greetings, filler and repetition.",
     },
+    {
+      id: "maple-0.5-quick", name: "Maple 0.5 Quick",
+      // Fine-tuned for fast, short answers (scripts/build-maple-quick.js). Local dev copy of the style:
+      style: "Quick mode: give the answer in the first sentence, keep the whole reply under about 80 words unless the user asks for more, and skip greetings and filler.",
+    },
   ],
   defaultModel: "maple-0.5",
 

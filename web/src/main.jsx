@@ -1,13 +1,12 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "@fontsource-variable/inter";
 import "@fontsource/open-sans/400.css";
 import "@fontsource/open-sans/500.css";
 import "@fontsource/open-sans/600.css";
 import "@fontsource/open-sans/700.css";
 import "./index.css";
-import Home from "./pages/Home";
 import Waitlist from "./pages/Waitlist";
 import { NotFound, Privacy, Terms } from "./pages/Legal";
 import { Boot } from "./chat/Boot";
@@ -22,7 +21,8 @@ createRoot(document.getElementById("root")).render(
     <LangProvider>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
+        {/* Until launch, the home page is the waitlist (firebase.json redirects "/" too). */}
+        <Route path="/" element={<Navigate to="/waitlist" replace />} />
         <Route path="/waitlist" element={<Waitlist />} />
         <Route path="/chat/:chatId?" element={<Suspense fallback={<Boot />}><ChatPage /></Suspense>} />
         <Route path="/share/:shareId" element={<Suspense fallback={<Boot />}><SharePage /></Suspense>} />

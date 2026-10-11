@@ -20,7 +20,7 @@ export function Brand({ small = false, compact = false, icon = true, className =
   return (
     <Link to="/" className={`inline-flex items-center gap-[.55rem] font-head font-[750] tracking-[-.02em] text-ink no-underline ${small ? "text-base" : "text-[1.08rem]"} ${className}`}>
       {icon && <img src="/favicon.svg" alt="" className={small ? "size-[26px] rounded-[7px]" : "size-[30px] rounded-lg"} />}
-      <span className={compact ? "max-[420px]:hidden" : ""}>ARTICxAI</span>
+      <span className={compact ? "max-[420px]:hidden" : ""}>ArticxAI</span>
     </Link>
   );
 }
