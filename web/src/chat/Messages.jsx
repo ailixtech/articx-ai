@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Markdown } from "../lib/markdown";
-import { splitPasted } from "../lib/pasted";
+import { joinPasted, splitPasted } from "../lib/pasted";
 import PastedCard from "./PastedCard";
-import { ChatIcon, CheckIcon, CopyIcon, DatabaseIcon, InfoIcon, LockIcon, ShareIcon, ThumbDownIcon, ThumbUpIcon } from "../components/Icons";
+import { ChatIcon, CheckIcon, CopyIcon, PenIcon, DatabaseIcon, InfoIcon, LockIcon, ShareIcon, ThumbDownIcon, ThumbUpIcon } from "../components/Icons";
 import { btn, iconBtn } from "../components/ui";
 import { CONFIG } from "../config";
 import { useLang } from "../i18n";
 
-const LIVE_TOPIC = /\b(aujourd'hui|ce soir|hier|cette (semaine|fin de semaine)|en ce moment|dernières? nouvelles|actualités?|récemment|élections?|sondages?|bourse|cours de|prix de|taux de change|taux d'intérêt|météo|prévisions?|qui a gagné|today|tonight|yesterday|this (week|weekend|month|morning|year)|right now|latest|breaking|news|headlines?|recent(ly)?|just (happened|announced|released)|elections?|polls?|stock|share price|price of|exchange rate|interest rate|scores?|standings|weather|forecast|who won|who is the (current|new)|20(2[5-9]|3\d))\b/i;
 const row = "mx-auto mb-[1.6rem] max-w-[760px]";
 
 export function UserBubble({ content }) {
@@ -24,18 +23,100 @@ export function UserBubble({ content }) {
   );
 }
 
+// "11:57 PM" today, "Oct 8, 11:57 PM" earlier this year, with the year before that.
+function timeLabel(at, locale) {
+  const d = new Date(at), now = new Date();
+  const time = { hour: "numeric", minute: "2-digit" };
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(locale, time);
+  return d.toLocaleString(locale, { month: "short", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}), ...time });
+}
+
+// A sent message with its time, Copy and Edit underneath (shown on hover, always on the latest one).
+// Editing replaces this message and everything after it, then asks again.
+export function UserMessage({ content, at, latest, canEdit, onEdit }) {
+  const { s } = useLang();
+  const t = s.chat.actions;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [done, setDone] = useState(false);
+  const boxRef = useRef(null);
+  const { pastes, text } = splitPasted(content);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!editing || !el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editing]);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (el) { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 320)}px`; }
+  }, [draft, editing]);
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text || content); setDone(true); setTimeout(() => setDone(false), 1500); } catch { /* clipboard blocked */ }
+  };
+  const save = () => {
+    const next = draft.trim();
+    setEditing(false);
+    if (next && next !== text) onEdit(joinPasted(pastes, next));
+  };
+
+  if (editing) {
+    return (
+      <div className={`${row} flex justify-end`}>
+        <div className="w-full max-w-[80%] rounded-[20px] border border-line bg-bg-2 p-3 focus-within:border-lake">
+          <textarea ref={boxRef} rows={1} value={draft} aria-label={t.editLabel} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.stopPropagation(); setEditing(false); }
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); }
+            }}
+            className="block w-full resize-none border-0 bg-transparent px-1 text-base text-ink outline-none" />
+          <div className="mt-2 flex justify-end gap-2">
+            <button type="button" className={btn("ghost", "sm")} onClick={() => setEditing(false)}>{t.cancel}</button>
+            <button type="button" className={btn("primary", "sm")} disabled={!draft.trim()} onClick={save}>{t.send}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={`${row} group flex flex-col items-end gap-2`}>
+      {pastes.length > 0 && (
+        <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
+          {pastes.map((p, i) => <PastedCard key={i} text={p} />)}
+        </div>
+      )}
+      {text && <div className="max-w-[80%] whitespace-pre-wrap rounded-[20px_20px_6px_20px] bg-lake-soft px-[1.05rem] py-[.7rem] text-ink [overflow-wrap:anywhere]">{text}</div>}
+      <div className={`-mt-1 -mr-1 flex items-center gap-[2px] transition-opacity focus-within:opacity-100 ${latest ? "opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"}`}>
+        {at && <span className="mr-1 text-[.78rem] text-muted tabular-nums">{timeLabel(at, s.locale)}</span>}
+        <button type="button" className={action(false)} title={done ? t.copied : t.copy} aria-label={done ? t.copied : t.copy} onClick={copy}>
+          {done ? <CheckIcon className="i size-4" /> : <CopyIcon className="i size-4" />}
+        </button>
+        {onEdit && (
+          <button type="button" className={action(false)} title={t.edit} aria-label={t.edit} disabled={!canEdit}
+            onClick={() => { setDraft(text); setEditing(true); }}>
+            <PenIcon className="i size-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const action = (on) => `${iconBtn} size-8! ${on ? "text-lake-deep!" : ""}`;
 
 // Copy, thumbs up / down and share under each finished reply.
 // Without onRate (e.g. on a shared chat) only Copy is shown.
-function ReplyActions({ text, rating, onRate, onDislike, onToast }) {
+function ReplyActions({ text, rating, onRate, onDislike, onToast, onShare }) {
   const { s } = useLang();
   const t = s.chat.actions;
   const [done, setDone] = useState(false);
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500); } catch { /* clipboard blocked */ }
   };
+  // Saved chats open the share-link window; a guest's reply is shared as text.
   const share = async () => {
+    if (onShare) return onShare();
     if (navigator.share) {
       try { await navigator.share({ title: "Maple", text }); } catch { /* cancelled */ }
       return;
@@ -62,7 +143,7 @@ function ReplyActions({ text, rating, onRate, onDislike, onToast }) {
   );
 }
 
-export function AssistantMessage({ content, streaming, rating, onRate, onDislike, onToast }) {
+export function AssistantMessage({ content, streaming, rating, onRate, onDislike, onToast, onShare }) {
   const { s } = useLang();
   return (
     <div className={row}>
@@ -75,30 +156,28 @@ export function AssistantMessage({ content, streaming, rating, onRate, onDislike
         ) : (
           <div className={`prose-reply ${streaming ? "typing" : ""}`}><Markdown text={content} /></div>
         )}
-        {!streaming && content && <ReplyActions text={content} rating={rating} onRate={onRate} onDislike={onDislike} onToast={onToast} />}
+        {!streaming && content && <ReplyActions text={content} rating={rating} onRate={onRate} onDislike={onDislike} onToast={onToast} onShare={onShare} />}
       </div>
     </div>
   );
 }
 
-export function MessageList({ messages, notice, listRef, gate, ratings = {}, onRate, onDislike, onToast }) {
+export function MessageList({ messages, notice, listRef, gate, ratings = {}, onRate, onDislike, onToast, onShare, onEdit, busy }) {
   const { s } = useLang();
   const items = [];
+  let lastUser = -1;
+  messages.forEach((m, i) => { if (m.role === "user") lastUser = i; });
   messages.forEach((m, i) => {
-    if (m.role === "user") items.push(<UserBubble key={i} content={m.content} />);
+    if (m.role === "user") {
+      items.push(<UserMessage key={i} content={m.content} at={m.at} latest={i === lastUser} canEdit={!busy}
+        onEdit={onEdit && ((next) => onEdit(i, next))} />);
+    }
     else {
       items.push(
-        <AssistantMessage key={i} content={m.content} streaming={m.streaming} rating={ratings[i]} onToast={onToast}
+        <AssistantMessage key={i} content={m.content} streaming={m.streaming} rating={ratings[i]} onToast={onToast} onShare={onShare}
           onRate={onRate && ((r) => onRate(i, r))} onDislike={onDislike && (() => onDislike(i))} />
       );
       if (m.sources?.length && !m.streaming) items.push(<Sources key={`s${i}`} list={m.sources} label={s.chat.sources} />);
-      if (!m.streaming && m.content && !m.searched && !m.sources?.length && i > 0 && messages[i - 1].role === "user" && LIVE_TOPIC.test(messages[i - 1].content)) {
-        items.push(
-          <p key={`n${i}`} className="mx-auto -mt-[.8rem] mb-[1.6rem] max-w-[760px] rounded-r-[10px] border-l-[3px] border-red bg-bg-2 px-[.9rem] py-[.65rem] text-[.87rem] text-muted">
-            {s.chat.liveNote}
-          </p>
-        );
-      }
     }
   });
   return (

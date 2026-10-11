@@ -69,9 +69,9 @@ const en = {
         { name: "Maple 0.5", badge: "Default", who: "Everyone, including guests",
           text: "Our standard model. Full, well-structured answers for drafting, explaining and planning.",
           points: ["Detailed explanations", "Long-form drafting", "Step-by-step reasoning"] },
-        { name: "Maple Q1", badge: "Accounts", who: "Free with an account",
-          text: "Tuned for brevity. Leads with the answer and keeps it short, so you can scan and move on.",
-          points: ["Answer-first replies", "Shorter, denser output", "Ideal on mobile"] },
+        { name: "Maple 0.5 Quick", badge: "Fast", who: "Everyone, including guests",
+          text: "Tuned for speed. Leads with the answer and keeps it short, for everyday questions.",
+          points: ["Answer-first replies", "Faster, shorter output", "Ideal on mobile"] },
       ],
     },
     residency: {
@@ -102,7 +102,7 @@ const en = {
       lead: "Something else?",
       contact: "Contact us",
       items: [
-        ["Is Maple free?", "Yes. You can send 3 messages without an account. A free account gives you saved history on every device and access to Maple Q1."],
+        ["Is Maple free?", "Yes. You can send 3 messages without an account. A free account gives you saved history on every device."],
         ["Does Maple speak French?", "Yes. Write in French and Maple answers in French; write in English and it answers in Canadian English. You can switch this website to French with the FR button at the top."],
         ["Where is my data stored?", "Your conversations are stored in Google Cloud's Toronto region. Your email address and sign-in are handled by our identity provider on Google Cloud, which may store them outside Canada."],
         ["Do you train on my conversations?", "No. We don't use your conversations to train our models unless you explicitly opt in. Chats may be reviewed to improve our systems, as described in our privacy policy."],
@@ -262,6 +262,7 @@ const en = {
     actions: {
       copy: "Copy", copied: "Copied", good: "Good response", bad: "Bad response", share: "Share", shareCopied: "Reply copied to share",
       thanks: "Thanks for your feedback.",
+      edit: "Edit message", editLabel: "Edit your message", cancel: "Cancel", send: "Send",
     },
     feedback: {
       title: "Give feedback", type: "What went wrong? (optional)", select: "Select…",
@@ -286,6 +287,7 @@ const en = {
     share: {
       title: "Share chat", lead: "Anyone with the link can read this chat as it is now. Your name and email aren't shown. New messages aren't added until you share again.",
       create: "Create link", update: "Update link", copy: "Copy link", copied: "Link copied", stop: "Stop sharing", close: "Close",
+      creating: "Creating link…", retry: "Try again", stopped: "This chat is no longer shared.",
       failed: "The link couldn't be created. Try again.", empty: "Send a message before sharing this chat.",
     },
     shared: {
@@ -317,8 +319,9 @@ const en = {
       more: (t) => `More options for ${t}`, pinned: "Pinned", recent: "Recent",
       pin: "Pin", unpin: "Unpin", share: "Share", rename: "Rename", remove: "Delete", renameLabel: "Chat name",
       renameFailed: "The chat couldn't be renamed. Try again.", pinFailed: "The chat couldn't be pinned. Try again.",
-      today: "Today", yesterday: "Yesterday", week: "Previous 7 days", month: "Previous 30 days",
+      today: "Today", yesterday: "Yesterday", week: "Previous 7 days", month: "Previous 30 days", year: "Earlier this year",
     },
+    history: { title: "Chats", search: "Search chats and messages…", searching: "Searching messages…", newChat: "New chat", close: "Close" },
     confirmDelete: (t) => `Delete "${t}"? This can't be undone.`,
     deleteFailed: "The chat couldn't be deleted. Check your connection and try again.",
     loadFailed: "This chat couldn't be loaded. Check your connection and refresh the page.",
@@ -342,6 +345,8 @@ const en = {
       title: "Settings", close: "Close settings", account: "Account", theme: "Theme", language: "Language",
       model: "Default model", modelHint: "Used for new messages.",
       sections: { general: "General", account: "Account", privacy: "Privacy", usage: "Usage", billing: "Billing" },
+      photo: "Profile picture", photoHint: "JPG, PNG or WebP. Shown only to you.", photoUpload: "Upload", photoChange: "Change", photoRemove: "Remove",
+      photoFailed: "The picture couldn't be saved. Try again.", photoInvalid: "Choose an image file.",
       name: "Name", email: "Email", signOut: "Sign out", signOutHint: "Sign out of ARTICxAI on this device.",
       deleteAccount: "Delete account", deleteHint: "We'll remove your account and all your chats.", deleteButton: "Contact us",
       deleteSubject: "Delete my ARTICxAI account",
@@ -362,7 +367,7 @@ const en = {
       messages: (u, l) => `${u.toLocaleString("en-CA")} of ${l.toLocaleString("en-CA")} messages`,
       usageNote: "Each message you send counts once toward all three limits. Replies don't count. Limits reset at midnight UTC.",
       plan: "Current plan", free: "Free", perMonth: "/ month",
-      includes: (l) => [`${l.day} messages a day, ${l.week.toLocaleString("en-CA")} a week`, "Maple 0.5 and Maple Q1", "Chat history stored in Toronto", "Email code on every sign-in"],
+      includes: (l) => [`${l.day} messages a day, ${l.week.toLocaleString("en-CA")} a week`, "Maple 0.5 and Maple 0.5 Quick", "Chat history stored in Toronto", "Email code on every sign-in"],
       more: {
         title: "Need more messages?",
         lead: "Upgrade for higher limits, or add a message pack when you run out. Paid options are coming soon. Tap Notify me and we'll email you when they're ready.",
@@ -379,7 +384,7 @@ const en = {
     },
     picker: {
       choose: "Choose a model", default: "Default", signUpToUse: "Sign up to use",
-      descriptions: { "maple-0.5": "Standard. Full, detailed answers.", "maple-q1": "Shorter, precise answers that save space.", "maple-0.5-quick": "Fast. Short, direct answers for everyday questions." },
+      descriptions: { "maple-0.5": "Standard. Full, detailed answers.", "maple-0.5-quick": "Fast. Short, direct answers for everyday questions." },
     },
     errors: {
       empty: "Maple didn't send an answer. The model server may be restarting, so try again in a moment.", generic: "Something went wrong while Maple was replying. Try again.",

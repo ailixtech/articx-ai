@@ -15,8 +15,8 @@ export default function Dialog({ title, onClose, children, width = 520 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(8,20,27,.45)] p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="dialog-title" style={{ width: `min(${width}px, 100%)` }}
-        className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[18px] border border-line bg-surface p-6 shadow-card">
-        <h2 id="dialog-title" className="m-0 mb-4 font-head text-[1.3rem] font-bold tracking-[-.01em]">{title}</h2>
+        className="relative max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[18px] border border-line bg-surface p-6 shadow-card">
+        <h2 id="dialog-title" className="m-0 mb-4 pr-10 font-head text-[1.3rem] font-bold tracking-[-.01em]">{title}</h2>
         {children}
       </div>
     </div>

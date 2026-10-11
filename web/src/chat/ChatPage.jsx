@@ -23,9 +23,11 @@ import UsageBar from "./UsageBar";
 import Composer from "./Composer";
 import FeedbackDialog from "./FeedbackDialog";
 import ShareDialog from "./ShareDialog";
+import HistoryDialog from "./HistoryDialog";
+import Avatar from "../components/Avatar";
 import { AccountChooser, LogoutDialog, forgetAccount, rememberAccount, rememberedAccount } from "./AccountDialogs";
 import { GateCard, LimitNotice, MessageList } from "./Messages";
-import { MenuIcon, PenIcon, SidebarIcon } from "../components/Icons";
+import { MenuIcon, PenIcon, SearchIcon, ShareIcon, SidebarIcon } from "../components/Icons";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { Brand, btn, iconBtn } from "../components/ui";
 import { LogoMark } from "../components/Logo";
@@ -75,14 +77,16 @@ function loadGuestChat() {
   try {
     const list = JSON.parse(store("session", GUEST_CHAT_KEY) || "[]");
     return Array.isArray(list)
-      ? list.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map(({ role, content, sources, searched }) => { const src = cleanSources(sources); return { role, content, ...(src ? { sources: src } : {}), ...(searched === true ? { searched: true } : {}) }; })
+      ? list.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map(({ role, content, sources, searched, at }) => { const src = cleanSources(sources); return { role, content, ...(src ? { sources: src } : {}), ...(searched === true ? { searched: true } : {}), ...(Number.isFinite(at) ? { at } : {}) }; })
       : [];
   } catch { return []; }
 }
 function saveGuestChat(list) {
-  const clean = list.filter((m) => !m.streaming).map(({ role, content }) => ({ role, content }));
+  const clean = list.filter((m) => !m.streaming).map(({ role, content, sources, searched, at }) => ({ role, content, sources, searched, at }));
   store("session", GUEST_CHAT_KEY, clean.length ? JSON.stringify(clean) : null);
 }
+// Pasted blocks count as text for search; the tags themselves don't.
+const plainSearchText = (content) => content.replace(/<\/?pasted_text>/g, " ");
 const replaceLast = (list, m) => [...list.slice(0, -1), m];
 
 export default function ChatPage() {
@@ -103,6 +107,8 @@ export default function ChatPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [photo, setPhoto] = useState(null); // profile picture (users/{uid}/meta/avatar)
   const [chooser, setChooser] = useState(null); // remembered account shown in "Welcome back", or {} for none
   const [usage, setUsage] = useState(null); // { used, limit } for today
   const [chats, setChats] = useState([]);
@@ -135,6 +141,7 @@ export default function ChatPage() {
   const sessionRef = useRef(0); // bumps whenever the visible chat changes
   const expectRoute = useRef(undefined); // route we navigated to ourselves
   const prevUid = useRef(undefined);
+  const textCache = useRef(new Map()); // chat id -> message text, for History search
   const loggedOut = useRef(false); // set by logOut so the chooser opens once the session ends
   const stickRef = useRef(false);
   const listRef = useRef(null);
@@ -185,7 +192,7 @@ export default function ChatPage() {
       const snap = await getDocs(query(messagesCol(userRef.current.uid, id), orderBy("createdAt")));
       if (sessionRef.current !== my) return;
       stickRef.current = true;
-      setMessages(snap.docs.map((d) => { const src = cleanSources(d.get("sources")); return { role: d.get("role"), content: d.get("content"), ...(src ? { sources: src } : {}), ...(d.get("searched") === true ? { searched: true } : {}) }; }));
+      setMessages(snap.docs.map((d) => { const src = cleanSources(d.get("sources")); const at = d.get("createdAt")?.toMillis?.(); return { role: d.get("role"), content: d.get("content"), ...(src ? { sources: src } : {}), ...(d.get("searched") === true ? { searched: true } : {}), ...(at ? { at } : {}) }; }));
     } catch (e) {
       console.error(e);
       if (sessionRef.current === my) setNotice(tRef.current.loadFailed);
@@ -272,7 +279,7 @@ export default function ChatPage() {
   function logOut() {
     const u = userRef.current;
     setConfirmLogout(false);
-    rememberAccount(u);
+    rememberAccount(u, photo);
     stopStreaming();
     loggedOut.current = true;
     signOut(fb.auth);
@@ -289,6 +296,8 @@ export default function ChatPage() {
     setMenuOpen(false);
     setSettingsOpen(false);
     setConfirmLogout(false);
+    setHistoryOpen(false);
+    textCache.current.clear();
     setChooser(!uid && loggedOut.current ? rememberedAccount() || {} : null);
     loggedOut.current = false;
     setFeedbackFor(null);
@@ -346,6 +355,14 @@ export default function ChatPage() {
 
   // ---------- Chat list and routing ----------
   useEffect(() => {
+    setPhoto(null);
+    if (!uid || !fb) return undefined;
+    return onSnapshot(doc(fb.db, "users", uid, "meta", "avatar"),
+      (snap) => setPhoto(snap.get("photo") || null),
+      (err) => console.error("Avatar error:", err));
+  }, [uid, fb]);
+
+  useEffect(() => {
     if (!uid || !fb) return undefined;
     return onSnapshot(
       query(chatsCol(uid), orderBy("updatedAt", "desc"), limit(200)),
@@ -399,6 +416,7 @@ export default function ChatPage() {
       if (!userRef.current) return;
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); setSidebarOpen((o) => !o); }
       if (mod && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); startNewChat(); }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); setHistoryOpen((o) => !o); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -419,6 +437,39 @@ export default function ChatPage() {
     if (!userRef.current && guestUsedNow() >= CONFIG.guestMessageLimit) return guestSubmit(text);
     send(text);
   }
+  // Editing a sent message drops it and everything after it (here and in Firestore), then asks again.
+  async function editMessage(i, content) {
+    if (controllerRef.current || msgsRef.current[i]?.role !== "user") return;
+    const my = sessionRef.current;
+    const u = userRef.current, id = chatIdRef.current;
+    setMessages(msgsRef.current.slice(0, i));
+    setRatings(Object.fromEntries(Object.entries(ratings).filter(([k]) => Number(k) < i)));
+    if (u && id) {
+      textCache.current.delete(id);
+      try {
+        const snap = await getDocs(query(messagesCol(u.uid, id), orderBy("createdAt")));
+        const refs = snap.docs.slice(i).map((d) => d.ref);
+        for (let k = 0; k < refs.length; k += 450) {
+          const batch = writeBatch(fb.db);
+          refs.slice(k, k + 450).forEach((ref) => batch.delete(ref));
+          await batch.commit();
+        }
+      } catch (e) { saveError(e); }
+    } else if (!u) saveGuestChat(msgsRef.current);
+    if (sessionRef.current !== my) return;
+    stickRef.current = true;
+    submit(content);
+  }
+
+  // All message text of one chat, for searching inside chats in the History window (cached per chat).
+  async function chatText(id) {
+    if (textCache.current.has(id)) return textCache.current.get(id);
+    const snap = await getDocs(query(messagesCol(userRef.current.uid, id), orderBy("createdAt")));
+    const text = snap.docs.map((d) => plainSearchText(String(d.get("content") || ""))).join("\n");
+    textCache.current.set(id, text);
+    return text;
+  }
+
   function guestSubmit(text) {
     stickRef.current = msgsRef.current.length > 0;
     setPending(text.slice(0, CONFIG.maxMessageChars));
@@ -466,7 +517,8 @@ export default function ChatPage() {
     const history = [...msgsRef.current.filter((m) => !m.streaming), { role: "user", content: text }]
       .slice(-CONFIG.maxHistoryMessages).map(({ role, content }) => ({ role, content }));
     stickRef.current = true;
-    setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "", streaming: true }]);
+    setMessages((m) => [...m, { role: "user", content: text, at: Date.now() }, { role: "assistant", content: "", streaming: true }]);
+    if (id) textCache.current.delete(id);
     if (asGuest) {
       const used = guestUsedNow() + 1;
       store("local", GUEST_USED_KEY, String(used));
@@ -521,6 +573,7 @@ export default function ChatPage() {
     if (reply.trim() && !asGuest) {
       addDoc(messagesCol(u.uid, id), { role: "assistant", content: reply.slice(0, MAX_SAVED_CHARS), ...(sources ? { sources } : {}), ...(searched ? { searched: true } : {}), createdAt: serverTimestamp() }).catch(saveError);
       updateDoc(doc(chatsCol(u.uid), id), { updatedAt: serverTimestamp() }).catch(saveError);
+      textCache.current.delete(id);
     }
     if (asGuest && !userRef.current && stillHere) saveGuestChat(msgsRef.current);
     if (!touch()) inputRef.current?.focus();
@@ -542,6 +595,7 @@ export default function ChatPage() {
         <nav aria-label={T.sidebar.quick} className="hidden w-[60px] flex-none flex-col items-center gap-[.35rem] border-r border-line pt-[calc(.75rem+env(safe-area-inset-top))] pb-3 lg:flex">
           <button type="button" className={iconBtn} aria-label={T.sidebar.open} aria-controls="sidebar" aria-expanded="false" title={T.sidebar.open} onClick={() => setSidebarOpen(true)}><SidebarIcon /></button>
           <button type="button" className={iconBtn} aria-label={T.sidebar.newChat} title={T.sidebar.newChat} onClick={startNewChat}><PenIcon /></button>
+          <button type="button" className={iconBtn} aria-label={T.sidebar.search} title={T.sidebar.search} onClick={() => setHistoryOpen(true)}><SearchIcon /></button>
         </nav>
       )}
       {uid && (
@@ -574,13 +628,16 @@ export default function ChatPage() {
               <button type="button" className={btn("primary", "sm")} onClick={() => setAuthView({ step: "signup" })}>{T.menu.signUp}</button>
             </>}
             {uid && <>
+              {currentChat && messages.length > 0 && (
+                <button type="button" className={`${btn("quiet", "sm")} px-3!`} aria-label={T.sidebar.share} title={T.sidebar.share} onClick={() => setShareFor(currentChat.id)}>
+                  <ShareIcon className="i size-[17px]" /><span className="max-sm:hidden">{T.sidebar.share}</span>
+                </button>
+              )}
               <button type="button" className={`${iconBtn} lg:hidden`} aria-label={T.sidebar.newChat} onClick={startNewChat}><PenIcon /></button>
               <button ref={avatarRef} type="button" aria-label={T.menu.button} aria-haspopup="menu" aria-expanded={menuOpen}
                 onClick={() => setMenuOpen((o) => !o)}
-                className="ml-1 size-9 flex-none cursor-pointer overflow-hidden rounded-full border-0 bg-lake p-0 font-head text-[.95rem] font-bold text-lake-ink">
-                {user.photoURL
-                  ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="block size-full object-cover" />
-                  : (user.displayName || user.email || "?").trim().charAt(0).toUpperCase()}
+                className="ml-1 flex-none cursor-pointer rounded-full border-0 bg-transparent p-0">
+                <Avatar photo={photo || user.photoURL} name={user.displayName} email={user.email} />
               </button>
             </>}
           </div>
@@ -596,6 +653,8 @@ export default function ChatPage() {
           ) : (
             <MessageList messages={messages} notice={notice} listRef={listRef}
               ratings={ratings} onRate={(i, r) => rate(i, r)} onDislike={setFeedbackFor} onToast={showToast}
+              onShare={uid && currentChat ? () => setShareFor(currentChat.id) : null}
+              onEdit={gated ? null : editMessage} busy={streaming}
               gate={gated ? (
                 <GateCard pending={pending} hadChat={messages.length > 0} onEdit={editPending}
                   onAuth={(step) => (step === "signin" ? openSignIn() : setAuthView({ step }))} />
@@ -617,23 +676,28 @@ export default function ChatPage() {
       </main>
 
       {menuOpen && uid && (
-        <UserMenu user={user} usage={usage} anchorRef={avatarRef} onClose={() => setMenuOpen(false)}
-          onHistory={() => { setMenuOpen(false); setSidebarOpen(true); setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 220); }}
+        <UserMenu user={user} photo={photo || user.photoURL} usage={usage} anchorRef={avatarRef} onClose={() => setMenuOpen(false)}
+          onHistory={() => { setMenuOpen(false); setHistoryOpen(true); }}
           onSettings={() => { setMenuOpen(false); setSettingsOpen(true); }}
           onSignOut={() => { setMenuOpen(false); setConfirmLogout(true); }} />
       )}
       {settingsOpen && uid && (
-        <Settings user={user} usage={usage} themePref={themePref} onTheme={setThemePref} model={model} onModel={chooseModel}
+        <Settings user={user} photo={photo} usage={usage} themePref={themePref} onTheme={setThemePref} model={model} onModel={chooseModel}
           backend={backend} onBackend={setBackend} onClose={() => setSettingsOpen(false)} fb={fb}
           onSignOut={() => { setSettingsOpen(false); setConfirmLogout(true); }} />
       )}
-      {confirmLogout && uid && <LogoutDialog user={user} onConfirm={logOut} onClose={() => setConfirmLogout(false)} />}
+      {confirmLogout && uid && <LogoutDialog user={user} photo={photo} onConfirm={logOut} onClose={() => setConfirmLogout(false)} />}
       {chooser && !uid && !authView.step && (
         <AccountChooser account={chooser.email ? chooser : null} onClose={() => setChooser(null)}
           onForget={() => { forgetAccount(); setChooser({}); }}
           onPick={(a) => { setChooser(null); setAuthView({ step: "signin", email: a.email }); }}
           onAnother={() => { setChooser(null); setAuthView({ step: "signin" }); }}
           onCreate={() => { setChooser(null); setAuthView({ step: "signup" }); }} />
+      )}
+      {historyOpen && uid && (
+        <HistoryDialog chats={chats} currentId={chatId} chatText={chatText} onClose={() => setHistoryOpen(false)}
+          onNew={() => { setHistoryOpen(false); startNewChat(); }}
+          onPick={(id) => { setHistoryOpen(false); if (mobile()) setSidebarOpen(false); navigate(`/chat/${id}`); }} />
       )}
       {feedbackFor != null && (
         <FeedbackDialog onClose={() => setFeedbackFor(null)} onSubmit={(extra) => rate(feedbackFor, "down", extra)} />

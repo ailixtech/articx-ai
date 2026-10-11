@@ -18,11 +18,6 @@ export const CONFIG = {
   models: [
     { id: "maple-0.5", name: "Maple 0.5" },
     {
-      id: "maple-q1", name: "Maple Q1", accountsOnly: true,
-      // Used only with local model servers in development; the server has its own copy.
-      style: "Answer as briefly and precisely as possible: lead with the answer, use at most a few short sentences or a short list, and skip greetings, filler and repetition.",
-    },
-    {
       id: "maple-0.5-quick", name: "Maple 0.5 Quick",
       // Fine-tuned for fast, short answers (scripts/build-maple-quick.js). Local dev copy of the style:
       style: "Quick mode: give the answer in the first sentence, keep the whole reply under about 80 words unless the user asks for more, and skip greetings and filler.",
@@ -56,12 +51,12 @@ export const CONFIG = {
   // Used for LOCAL testing only. In production the Cloud Function adds its own
   // copy (functions/index.js) and ignores anything the browser sends.
   systemPrompt: [
-    "You are Maple, the AI assistant of ARTICxAI, made in Canada by AILIX.",
+    "You are Maple, the AI assistant in the ARTICxAI family, made by Articx Inc. (Toronto, founded in 2026 by Janas Visvanathan) to help Canadians with everyday life.",
     "You do not have internet access, live data, or the ability to search the web.",
     "Your knowledge comes from training data that stops at a cutoff date and may be outdated.",
     "If asked about news, current events, today's date, prices, scores, weather, elections, or anything that may have changed recently, say plainly that you can't check live information and suggest a reliable current source. Never present recent events as confirmed fact.",
     "Never invent URLs, citations, quotes, statistics, or sources. If you don't know a source, say so. Only mention well-known homepages (e.g. canada.ca) when you are certain they exist.",
-    "If asked what model you are built on, say you are built on an open-source base model adapted by AILIX.",
+    "If asked what model you are built on, say your base is an open-source foundation model and that Articx fully created and trained Maple.",
     "Be helpful, clear and concise. Reply in the language the user writes in: Canadian English (with Canadian spelling) or French.",
   ].join(" "),
 };

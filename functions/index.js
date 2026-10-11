@@ -60,14 +60,14 @@ const MAX_CHARS_PER_MESSAGE = 100000;
 const MAX_CONTEXT_CHARS = defineInt("MAX_CONTEXT_CHARS", { default: 120000 });
 
 const { SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, STYLES } = require("./prompts");
+const { emergencyKind, EMERGENCY_PROMPT } = require("./safety");
 
-// Maple models offered in the app. Both run on MODEL_NAME; Maple Q1 asks for short,
-// precise answers and has a smaller reply budget. Guests can only use the default.
+// Maple models offered in the app: Maple 0.5 (standard) and Maple 0.5 Quick (short, fast answers).
+// Unknown ids, such as the retired maple-q1, fall back to the default.
 // Keep ids in step with MODELS in web/src/config.js.
 const DEFAULT_MODEL = "maple-0.5";
 const MODELS = {
   "maple-0.5": { maxTokens: 2048, style: STYLES["maple-0.5"] },
-  "maple-q1": { maxTokens: 700, style: STYLES["maple-q1"], accountsOnly: true },
   // Fine-tuned quick model (scripts/build-maple-quick.js). Served under MODEL_NAME_QUICK;
   // until that's set it falls back to MODEL_NAME with the quick style.
   "maple-0.5-quick": { maxTokens: 600, style: STYLES["maple-0.5-quick"], quick: true },
@@ -227,7 +227,10 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
     // Fresh info from the web when needed. Runs after the quota check,
     // so users over their limit never trigger a paid search.
-    const search = lastUser ? await getSearchContext(lastUser.content) : null;
+    // Emergencies get an emergency-first answer and skip web search.
+    const emergency = lastUser ? emergencyKind(lastUser.content) : null;
+    if (emergency) logger.warn("Emergency message detected", { kind: emergency });
+    const search = lastUser && !emergency ? await getSearchContext(lastUser.content) : null;
     if (search) logger.info("Web search used", { kind: search.kind, results: search.sources.length, links: search.links.length });
 
     // 4. Forward to the model server and stream the reply back.
@@ -236,7 +239,9 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
     const core = search ? SEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
     const basePrompt = model.style ? `${core} ${model.style}` : core;
-    const systemPrompt = search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
+    const systemPrompt = emergency
+      ? `${basePrompt}\n\n${EMERGENCY_PROMPT[emergency]}`
+      : search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
 
     try {
       const quickUrl = model.quick ? MODEL_API_URL_QUICK.value() : "";

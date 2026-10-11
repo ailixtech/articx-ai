@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { CONFIG, IS_LOCAL } from "../config";
 import { CardIcon, CheckIcon, CloseIcon, GaugeIcon, GearIcon, ShieldIcon, UserIcon } from "../components/Icons";
+import Avatar, { resizeImage } from "../components/Avatar";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { btn, iconBtn } from "../components/ui";
 import { useLang } from "../i18n";
@@ -76,11 +77,51 @@ function General({ t, themePref, onTheme, model, onModel, backend, onBackend, s 
   );
 }
 
-function Account({ t, user, s, onSignOut }) {
+// Upload or remove the profile picture (users/{uid}/meta/avatar). The page's live listener shows the change.
+function PhotoRow({ t, fb, user, photo }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const fileRef = useRef(null);
+  const avatarDoc = () => doc(fb.db, "users", user.uid, "meta", "avatar");
+  const upload = async (file) => {
+    if (!file) return;
+    setBusy(true); setError(null);
+    try {
+      const data = await resizeImage(file).catch(() => { throw new Error("not_image"); });
+      await setDoc(avatarDoc(), { photo: data, updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.error("Photo upload failed:", e);
+      setError(e.message === "not_image" ? t.photoInvalid : t.photoFailed);
+    } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+  const remove = async () => {
+    setBusy(true); setError(null);
+    try { await deleteDoc(avatarDoc()); } catch (e) { console.error(e); setError(t.photoFailed); } finally { setBusy(false); }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-4 border-b border-line py-[.9rem]">
+      <Avatar photo={photo} name={user.displayName} email={user.email} className="size-14 text-[1.15rem]" />
+      <div className="min-w-0 flex-1">
+        <div className="font-head text-[.92rem] font-semibold">{t.photo}</div>
+        <div className="text-[.82rem] text-muted">{t.photoHint}</div>
+        {error && <div role="alert" className="mt-1 text-[.82rem] text-red">{error}</div>}
+      </div>
+      <div className="flex gap-2">
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" tabIndex={-1} aria-hidden="true"
+          onChange={(e) => upload(e.target.files?.[0])} />
+        <button type="button" className={btn("ghost", "sm")} disabled={busy} onClick={() => fileRef.current?.click()}>{photo ? t.photoChange : t.photoUpload}</button>
+        {photo && <button type="button" className={`${btn("quiet", "sm")} text-red!`} disabled={busy} onClick={remove}>{t.photoRemove}</button>}
+      </div>
+    </div>
+  );
+}
+
+function Account({ t, user, s, fb, photo, onSignOut }) {
   const mail = `mailto:${s.chat.menu.supportEmail}?subject=${encodeURIComponent(t.deleteSubject)}`;
   return (
     <>
       <h3 className={heading}>{t.sections.account}</h3>
+      <PhotoRow t={t} fb={fb} user={user} photo={photo} />
       <Row label={t.name}><span className="truncate text-[.9rem]">{user.displayName || s.chat.menu.yourAccount}</span></Row>
       <Row label={t.email}><span className="min-w-0 truncate text-[.9rem]">{user.email}</span></Row>
       <Row label={t.signOut} hint={t.signOutHint}>
@@ -258,7 +299,7 @@ function Billing({ t, lang, fb, user }) {
   );
 }
 
-export default function Settings({ fb, user, usage, themePref, onTheme, model, onModel, backend, onBackend, onSignOut, onClose, initialSection = "general" }) {
+export default function Settings({ fb, user, photo, usage, themePref, onTheme, model, onModel, backend, onBackend, onSignOut, onClose, initialSection = "general" }) {
   const { lang, s } = useLang();
   const t = s.chat.settings;
   const [section, setSection] = useState(initialSection);
@@ -273,7 +314,7 @@ export default function Settings({ fb, user, usage, themePref, onTheme, model, o
     return () => { document.removeEventListener("keydown", onKey); before?.focus?.(); };
   }, []);
 
-  const props = { t, s, fb, user, usage, lang, themePref, onTheme, model, onModel, backend, onBackend, onSignOut };
+  const props = { t, s, fb, user, photo, usage, lang, themePref, onTheme, model, onModel, backend, onBackend, onSignOut };
   const Body = { general: General, account: Account, privacy: Privacy, usage: Usage, billing: Billing }[section];
 
   return (

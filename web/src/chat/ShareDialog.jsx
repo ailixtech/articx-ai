@@ -1,55 +1,72 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Dialog from "../components/Dialog";
-import { CheckIcon, LinkIcon } from "../components/Icons";
-import { btn } from "../components/ui";
+import { CheckIcon, CloseIcon, LinkIcon } from "../components/Icons";
+import { btn, iconBtn } from "../components/ui";
 import { useLang } from "../i18n";
 import { call } from "./account";
 
-// Creates, refreshes or removes a chat's public link (functions/share.js).
-// chat.shareId comes from the live chat list, so the dialog updates by itself.
+// Opens with the chat's public link ready to copy (functions/share.js): the link is created
+// on open if the chat isn't shared yet. chat.shareId comes from the live chat list.
 export default function ShareDialog({ fb, chat, onClose }) {
   const { s } = useLang();
   const t = s.chat.share;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
-  const url = chat.shareId ? `${location.origin}/share/${chat.shareId}` : null;
+  const [stopped, setStopped] = useState(false);
+  const [madeId, setMadeId] = useState(null); // shown right away, before the chat list catches up
+  const started = useRef(false);
+  const id = stopped ? null : chat.shareId || madeId;
+  const url = id ? `${location.origin}/share/${id}` : null;
 
-  const run = async (data) => {
-    setBusy(true); setError(null);
+  const run = async (data = {}) => {
+    setBusy(true); setError(null); setCopied(false);
     try {
-      const { id } = await call(fb, "shareChat", { chatId: chat.id, ...data });
-      if (id) copy(`${location.origin}/share/${id}`);
+      const r = await call(fb, "shareChat", { chatId: chat.id, ...data });
+      setMadeId(r.id || null);
+      setStopped(!!data.stop);
     } catch (e) {
       console.error(e);
       setError(e?.code === "functions/failed-precondition" ? t.empty : t.failed);
     } finally { setBusy(false); }
   };
-  const copy = async (link) => {
-    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    if (!chat.shareId) run();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const copy = async () => {
+    if (!url) return;
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); }
+    catch { document.getElementById("share-url")?.select(); }
   };
 
   return (
     <Dialog title={t.title} onClose={onClose}>
-      <p className="m-0 mb-4 truncate font-head text-[.95rem] font-semibold">{chat.title}</p>
-      <p className="m-0 mb-4 text-[.88rem] text-muted">{t.lead}</p>
-      {url && (
-        <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-line bg-bg-2 py-1 pr-1 pl-3">
+      <button type="button" data-skip-focus className={`${iconBtn} absolute top-3 right-3`} aria-label={t.close} title={t.close} onClick={onClose}><CloseIcon /></button>
+      <p className="m-0 mb-1 truncate font-head text-[.95rem] font-semibold">{chat.title}</p>
+      <p className="m-0 mb-4 text-[.86rem] text-muted">{stopped ? t.stopped : t.lead}</p>
+      {!stopped && (
+        <div className="mb-3 flex items-center gap-2 rounded-full border border-line bg-bg-2 py-[.3rem] pr-[.3rem] pl-4">
           <LinkIcon className="i size-4 flex-none text-muted" />
-          <input readOnly value={url} aria-label={t.title} onFocus={(e) => e.target.select()}
-            className="min-w-0 flex-1 border-0 bg-transparent text-[.88rem] text-ink outline-none" />
-          <button type="button" className={btn("primary", "sm")} onClick={() => copy(url)}>
-            {copied ? <><CheckIcon className="i size-4" />{t.copied}</> : t.copy}
+          <input id="share-url" readOnly value={url || (busy ? t.creating : "")} aria-label={t.title} onFocus={(e) => e.target.select()}
+            className={`min-w-0 flex-1 border-0 bg-transparent text-[.9rem] outline-none ${url ? "text-ink" : "text-muted"}`} />
+          <button type="button" className={`${btn("primary", "sm")} rounded-full!`} disabled={!url || busy} onClick={copy}>
+            {busy && !url
+              ? <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+              : copied ? <><CheckIcon className="i size-4" />{t.copied}</> : t.copy}
           </button>
         </div>
       )}
       {error && <p role="alert" className="mt-0 mb-3 text-[.85rem] text-red">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
-        {url && <button type="button" className={`${btn("ghost", "sm")} mr-auto text-red!`} disabled={busy} onClick={() => run({ stop: true })}>{t.stop}</button>}
-        <button type="button" className={btn("ghost", "sm")} onClick={onClose}>{t.close}</button>
-        <button type="button" className={btn(url ? "ghost" : "primary", "sm")} disabled={busy} onClick={() => run({})}>
-          {!url && copied ? t.copied : url ? t.update : t.create}
-        </button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {url && <button type="button" className={`${btn("quiet", "sm")} mr-auto text-red!`} disabled={busy} onClick={() => run({ stop: true })}>{t.stop}</button>}
+        {(url || stopped || error) && (
+          <button type="button" className={btn("ghost", "sm")} disabled={busy} onClick={() => run()}>
+            {error && !url ? t.retry : url ? t.update : t.create}
+          </button>
+        )}
       </div>
     </Dialog>
   );

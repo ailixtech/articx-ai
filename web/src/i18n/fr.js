@@ -69,9 +69,9 @@ const fr = {
         { name: "Maple 0.5", badge: "Par défaut", who: "Tout le monde, y compris les invités",
           text: "Notre modèle standard. Des réponses complètes et bien structurées pour rédiger, expliquer et planifier.",
           points: ["Explications détaillées", "Rédaction de textes longs", "Raisonnement étape par étape"] },
-        { name: "Maple Q1", badge: "Comptes", who: "Gratuit avec un compte",
-          text: "Optimisé pour la concision. Il va droit au but et reste bref, pour que vous puissiez lire rapidement et passer à autre chose.",
-          points: ["La réponse d'abord", "Contenu plus court et plus dense", "Idéal sur mobile"] },
+        { name: "Maple 0.5 Quick", badge: "Rapide", who: "Tout le monde, y compris les invités",
+          text: "Optimisé pour la rapidité. Il va droit au but et reste bref, pour les questions du quotidien.",
+          points: ["La réponse d'abord", "Réponses plus rapides et plus courtes", "Idéal sur mobile"] },
       ],
     },
     residency: {
@@ -102,7 +102,7 @@ const fr = {
       lead: "Une autre question?",
       contact: "Écrivez-nous",
       items: [
-        ["Maple est-il gratuit?", "Oui. Vous pouvez envoyer 3 messages sans compte. Un compte gratuit vous donne accès à votre historique sur tous vos appareils et au modèle Maple Q1."],
+        ["Maple est-il gratuit?", "Oui. Vous pouvez envoyer 3 messages sans compte. Un compte gratuit vous donne accès à votre historique sur tous vos appareils."],
         ["Maple parle-t-il français?", "Oui. Écrivez en français et Maple vous répond en français; écrivez en anglais et il vous répond en anglais canadien. Vous pouvez afficher ce site en anglais avec le bouton EN en haut de la page."],
         ["Où mes données sont-elles stockées?", "Vos conversations sont stockées dans la région de Toronto de Google Cloud. Votre adresse courriel et votre connexion sont gérées par notre fournisseur d'identité sur Google Cloud, qui peut les stocker à l'extérieur du Canada."],
         ["Utilisez-vous mes conversations pour entraîner vos modèles?", "Non. Nous n'utilisons pas vos conversations pour entraîner nos modèles sans votre consentement explicite. Les conversations peuvent être examinées afin d'améliorer nos systèmes, comme le décrit notre politique de confidentialité."],
@@ -264,6 +264,7 @@ const fr = {
     actions: {
       copy: "Copier", copied: "Copié", good: "Bonne réponse", bad: "Mauvaise réponse", share: "Partager", shareCopied: "Réponse copiée pour la partager",
       thanks: "Merci pour vos commentaires.",
+      edit: "Modifier le message", editLabel: "Modifier votre message", cancel: "Annuler", send: "Envoyer",
     },
     feedback: {
       title: "Donner votre avis", type: "Quel était le problème? (facultatif)", select: "Choisir…",
@@ -287,6 +288,7 @@ const fr = {
     share: {
       title: "Partager la conversation", lead: "Toute personne qui a le lien peut lire cette conversation telle qu'elle est maintenant. Votre nom et votre courriel ne sont pas affichés. Les nouveaux messages ne sont ajoutés que si vous partagez de nouveau.",
       create: "Créer le lien", update: "Mettre à jour le lien", copy: "Copier le lien", copied: "Lien copié", stop: "Arrêter le partage", close: "Fermer",
+      creating: "Création du lien…", retry: "Réessayer", stopped: "Cette conversation n'est plus partagée.",
       failed: "Le lien n'a pas pu être créé. Réessayez.", empty: "Envoyez un message avant de partager cette conversation.",
     },
     shared: {
@@ -318,8 +320,9 @@ const fr = {
       more: (t) => `Plus d'options pour ${t}`, pinned: "Épinglées", recent: "Récentes",
       pin: "Épingler", unpin: "Désépingler", share: "Partager", rename: "Renommer", remove: "Supprimer", renameLabel: "Nom de la conversation",
       renameFailed: "La conversation n'a pas pu être renommée. Réessayez.", pinFailed: "La conversation n'a pas pu être épinglée. Réessayez.",
-      today: "Aujourd'hui", yesterday: "Hier", week: "7 derniers jours", month: "30 derniers jours",
+      today: "Aujourd'hui", yesterday: "Hier", week: "7 derniers jours", month: "30 derniers jours", year: "Plus tôt cette année",
     },
+    history: { title: "Conversations", search: "Rechercher dans les conversations…", searching: "Recherche dans les messages…", newChat: "Nouvelle conversation", close: "Fermer" },
     confirmDelete: (t) => `Supprimer « ${t} »? Cette action est irréversible.`,
     deleteFailed: "La conversation n'a pas pu être supprimée. Vérifiez votre connexion et réessayez.",
     loadFailed: "Cette conversation n'a pas pu être chargée. Vérifiez votre connexion et actualisez la page.",
@@ -343,6 +346,8 @@ const fr = {
       title: "Paramètres", close: "Fermer les paramètres", account: "Compte", theme: "Thème", language: "Langue",
       model: "Modèle par défaut", modelHint: "Utilisé pour les nouveaux messages.",
       sections: { general: "Général", account: "Compte", privacy: "Confidentialité", usage: "Utilisation", billing: "Facturation" },
+      photo: "Photo de profil", photoHint: "JPG, PNG ou WebP. Visible par vous seulement.", photoUpload: "Téléverser", photoChange: "Changer", photoRemove: "Retirer",
+      photoFailed: "La photo n'a pas pu être enregistrée. Réessayez.", photoInvalid: "Choisissez un fichier image.",
       name: "Nom", email: "Courriel", signOut: "Se déconnecter", signOutHint: "Se déconnecter d'ARTICxAI sur cet appareil.",
       deleteAccount: "Supprimer le compte", deleteHint: "Nous supprimerons votre compte et toutes vos conversations.", deleteButton: "Nous écrire",
       deleteSubject: "Supprimer mon compte ARTICxAI",
@@ -363,7 +368,7 @@ const fr = {
       messages: (u, l) => `${u.toLocaleString("fr-CA")} messages sur ${l.toLocaleString("fr-CA")}`,
       usageNote: "Chaque message envoyé compte une fois dans les trois limites. Les réponses ne comptent pas. Les limites sont réinitialisées à minuit UTC.",
       plan: "Forfait actuel", free: "Gratuit", perMonth: "/ mois",
-      includes: (l) => [`${l.day} messages par jour, ${l.week.toLocaleString("fr-CA")} par semaine`, "Maple 0.5 et Maple Q1", "Historique stocké à Toronto", "Code par courriel à chaque connexion"],
+      includes: (l) => [`${l.day} messages par jour, ${l.week.toLocaleString("fr-CA")} par semaine`, "Maple 0.5 et Maple 0.5 Quick", "Historique stocké à Toronto", "Code par courriel à chaque connexion"],
       more: {
         title: "Besoin de plus de messages?",
         lead: "Passez à un forfait aux limites plus élevées, ou ajoutez un lot de messages quand vous manquez de place. Les options payantes arrivent bientôt. Touchez M'aviser et nous vous écrirons quand elles seront prêtes.",
@@ -380,7 +385,7 @@ const fr = {
     },
     picker: {
       choose: "Choisir un modèle", default: "Par défaut", signUpToUse: "Inscrivez-vous pour l'utiliser",
-      descriptions: { "maple-0.5": "Standard. Des réponses complètes et détaillées.", "maple-q1": "Des réponses plus courtes et précises, qui prennent moins de place.", "maple-0.5-quick": "Rapide. Des réponses courtes et directes pour le quotidien." },
+      descriptions: { "maple-0.5": "Standard. Des réponses complètes et détaillées.", "maple-0.5-quick": "Rapide. Des réponses courtes et directes pour le quotidien." },
     },
     errors: {
       empty: "Maple n'a pas envoyé de réponse. Le serveur du modèle redémarre peut-être : réessaie dans un instant.", generic: "Un problème est survenu pendant la réponse de Maple. Réessayez.",

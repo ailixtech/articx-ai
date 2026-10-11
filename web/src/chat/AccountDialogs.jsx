@@ -1,6 +1,7 @@
 // "Are you sure you want to log out?" and the "Welcome back" account chooser shown after logging out.
 // The chooser remembers the last account on this device (name and email only) so signing back in is one click.
 import { useEffect, useRef } from "react";
+import AvatarCircle from "../components/Avatar";
 import { CloseIcon } from "../components/Icons";
 import { iconBtn } from "../components/ui";
 import { store } from "../lib/storage";
@@ -8,9 +9,9 @@ import { useLang } from "../i18n";
 
 const LAST_ACCOUNT_KEY = "articx-last-account";
 
-export function rememberAccount(user) {
+export function rememberAccount(user, photo) {
   if (!user?.email) return;
-  store("local", LAST_ACCOUNT_KEY, JSON.stringify({ name: user.displayName || "", email: user.email, photo: user.photoURL || "" }));
+  store("local", LAST_ACCOUNT_KEY, JSON.stringify({ name: user.displayName || "", email: user.email, photo: photo || user.photoURL || "" }));
 }
 export function rememberedAccount() {
   try {
@@ -46,14 +47,7 @@ function Modal({ labelId, onClose, children }) {
   );
 }
 
-function Avatar({ account }) {
-  const letters = (account.name || account.email).trim().split(/\s+/).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join("");
-  return (
-    <span className="grid size-11 flex-none place-items-center overflow-hidden rounded-full bg-lake font-head text-[.95rem] font-semibold text-lake-ink">
-      {account.photo ? <img src={account.photo} alt="" referrerPolicy="no-referrer" className="block size-full object-cover" /> : letters}
-    </span>
-  );
-}
+const Avatar = ({ account }) => <AvatarCircle photo={account.photo} name={account.name} email={account.email} className="size-11 text-[.95rem]" />;
 
 function AccountText({ account }) {
   return (
@@ -64,10 +58,10 @@ function AccountText({ account }) {
   );
 }
 
-export function LogoutDialog({ user, onConfirm, onClose }) {
+export function LogoutDialog({ user, photo, onConfirm, onClose }) {
   const { s } = useLang();
   const t = s.chat.logout;
-  const account = { name: user.displayName || "", email: user.email || "", photo: user.photoURL || "" };
+  const account = { name: user.displayName || "", email: user.email || "", photo: photo || user.photoURL || "" };
   return (
     <Modal labelId="logout-title" onClose={onClose}>
       <h2 id="logout-title" className="mx-auto mt-0 mb-6 max-w-[16ch] font-head text-[1.45rem] font-semibold leading-[1.25] tracking-[-.02em]">{t.title}</h2>

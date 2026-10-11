@@ -5,15 +5,17 @@ import { MoreIcon, PenIcon, PinIcon, SearchIcon, ShareIcon, SidebarIcon, TrashIc
 import { Brand, iconBtn } from "../components/ui";
 import { useLang } from "../i18n";
 
-function groupOf(d, t, locale) {
+// History groups: Today, Yesterday, Previous 7 days, Previous 30 days, Earlier this year, then one per year.
+export function groupOf(d, t) {
+  const now = new Date();
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(new Date()) - day(d)) / 864e5);
+  const diff = Math.round((day(now) - day(d)) / 864e5);
   if (diff <= 0) return t.today;
   if (diff === 1) return t.yesterday;
   if (diff < 7) return t.week;
   if (diff < 30) return t.month;
-  const label = d.toLocaleDateString(locale, { month: "long", year: "numeric" });
-  return label.charAt(0).toUpperCase() + label.slice(1);
+  if (d.getFullYear() === now.getFullYear()) return t.year;
+  return String(d.getFullYear());
 }
 
 const heading = "px-[.7rem] pt-4 pb-[.35rem] font-head text-[.76rem] font-semibold text-muted";
@@ -145,7 +147,7 @@ export default function Sidebar({ open, onClose, onNew, chats, currentId, onDele
   let group = null;
   for (const c of shown) {
     if (c.pinned) continue;
-    const g = groupOf(c.updated, t, s.locale);
+    const g = groupOf(c.updated, t);
     if (g !== group) { group = g; rows.push(<div key={`g-${g}`} className={heading}>{g}</div>); }
     rows.push(row(c));
   }

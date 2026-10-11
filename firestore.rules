@@ -2,6 +2,7 @@ rules_version = '2';
 
 // ARTICxAI: each signed-in user can only read and write their own chats.
 // Layout:  users/{uid}                                     { firstName, birthDate, country, createdAt }
+//          users/{uid}/meta/avatar                         { photo, updatedAt } (profile picture)
 //          users/{uid}/chats/{chatId}                      { title, createdAt, updatedAt, pinned?, shareId? }
 //          users/{uid}/chats/{chatId}/messages/{messageId} { role, content, createdAt, sources? }
 //          usage/{uid}_{YYYY-MM-DD}, _w{YYYY-MM-DD}, _m{YYYY-MM}  { count, limit } (read-only: day, week, month counts)
@@ -30,6 +31,17 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow write: if false;
+    }
+
+    // Profile picture { photo, updatedAt }: a small JPEG data URL (resized in the browser), owner only.
+    match /users/{uid}/meta/avatar {
+      allow read, delete: if verifiedOwner(uid);
+      allow write: if verifiedOwner(uid)
+        && request.resource.data.keys().hasOnly(['photo', 'updatedAt'])
+        && request.resource.data.photo is string
+        && request.resource.data.photo.size() <= 200000
+        && request.resource.data.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+        && request.resource.data.updatedAt == request.time;
     }
 
     // An account's own day, week and month counters (Settings > Usage). Written only by the chat function.

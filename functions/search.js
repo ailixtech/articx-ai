@@ -20,7 +20,8 @@ const SEARCH_WORDS = [
   "leader", "who is the",
   // government & rules
   "immigration", "visa", "permit", "pr card", "permanent resident", "citizenship",
-  "express entry", "ircc", "tax", "taxes", "benefit", "benefits", "ei", "cpp", "oas", "health card",
+  "express entry", "ircc", "crs", "crs score", "noc", "teer", "lmia", "pgwp", "work permit", "study permit",
+  "processing time", "processing times", "fee", "fees", "points", "tax", "taxes", "benefit", "benefits", "ei", "cpp", "oas", "health card",
   "driver's licence", "drivers license", "law", "rule", "rules", "deadline",
   // French
   "aujourd'hui", "hier", "demain", "actuel", "actuellement", "dernières", "nouvelles",
@@ -29,6 +30,7 @@ const SEARCH_WORDS = [
 const IMMIGRATION_WORDS = [
   "immigration", "visa", "permit", "pr card", "permanent resident",
   "citizenship", "express entry", "ircc", "refugee", "permis",
+  "crs", "noc", "teer", "lmia", "pgwp", "work permit", "study permit",
 ];
 
 // Whole-word match, so "rate" doesn't fire on "generate" or "ei" on "their".
@@ -41,7 +43,7 @@ function needsSearch(question) {
 }
 
 // What kind of question is it? Decides where to look and whether to show links.
-const WEATHER_RE = /(?<![\p{L}'])(weather|forecast|temperature|rain|raining|snow|snowing|humid|humidity|météo|prévisions?|température|pluie|neige)(?![\p{L}])/iu;
+const WEATHER_RE = /(?<![\p{L}'])(weather|wether|wheather|weathr|waether|forecast|forcast|forecst|temperature|temprature|tempature|rain|raining|rainy|raning|snow|snowing|snowng|snowy|sno|humid|humidity|météo|meteo|mété|prévisions?|previsions?|température|temperature|pluie|neige)(?![\p{L}])/iu;
 const NEWS_RE = /(?<![\p{L}'])(news|headlines?|breaking|latest on|what happened|nouvelles|actualités?)(?![\p{L}])/iu;
 // "Where is it snowing?", "which provinces got snow?" → look for reports, not one city's forecast.
 const WHERE_RE = /(?<![\p{L}])(where|which (city|cities|province|provinces|places?|areas?|regions?)|anywhere|first snow|où|quelles? (villes?|provinces?|régions?))(?![\p{L}])/iu;
@@ -66,14 +68,14 @@ const WMO = {
   80: "light showers", 81: "showers", 82: "heavy showers", 85: "snow showers", 86: "heavy snow showers",
   95: "thunderstorm", 96: "thunderstorm with hail", 99: "thunderstorm with hail",
 };
-const WHEN_WORDS = /\b(today|tonight|tomorrow|now|right now|this (week|weekend|morning|afternoon|evening)|currently|aujourd'hui|demain|ce soir|maintenant|cette semaine|en ce moment)\b.*$/iu;
+const WHEN_WORDS = /\b(today|todya|tody|tonight|tomorrow|tomorow|tommorow|tmrw|tmr|now|rn|right now|this (week|weekend|morning|afternoon|evening)|currently|aujourd'hui|demain|ce soir|maintenant|cette semaine|en ce moment)\b.*$/iu;
 
 function placeFrom(question) {
   const q = question.replace(/[?!]/g, " ").replace(/\.(\s|$)/g, " ").replace(/\s+/g, " ").trim();
-  let m = q.match(/(?:^|\s)(?:in|at|for|near|à|au|aux|en|pour)\s+([\p{L}][\p{L} .,'&-]{1,60})/iu)
+  let m = q.match(/(?:^|\s)(?:in|at|for|near|à|a|au|aux|en|pour)\s+([\p{L}][\p{L} .,'&-]{1,60})/iu)
     || q.match(/^([\p{L}][\p{L} .'-]{1,40}?)\s+(?:weather|forecast|météo)\b/iu);
   if (!m) return null;
-  const place = m[1].replace(WHEN_WORDS, "").replace(/\b(weather|forecast|météo|like|today)\b/giu, "").trim();
+  const place = m[1].replace(WHEN_WORDS, "").replace(/\b(weather|wether|whether|wheather|forecast|forcast|météo|meteo|like|today|todya)\b/giu, "").trim();
   return place.length >= 2 ? place : null;
 }
 
@@ -114,9 +116,30 @@ async function weatherSearch(question) {
   };
 }
 
+// Misspelled Canadian city → closest known name ("Torono" → "Toronto"), at most 2 letters off.
+const KNOWN_CITIES = ["Toronto", "Montreal", "Montréal", "Vancouver", "Calgary", "Edmonton", "Ottawa", "Winnipeg", "Quebec", "Québec",
+  "Hamilton", "Kitchener", "London", "Halifax", "Victoria", "Saskatoon", "Regina", "Mississauga", "Brampton", "Surrey", "Laval",
+  "Gatineau", "Markham", "Vaughan", "Oshawa", "Windsor", "Sherbrooke", "Saguenay", "Kelowna", "Barrie", "Guelph", "Kingston",
+  "Moncton", "Fredericton", "Charlottetown", "St. John's", "Whitehorse", "Yellowknife", "Iqaluit", "Thunder Bay", "Sudbury",
+  "Lethbridge", "Red Deer", "Nanaimo", "Kamloops", "Banff", "Jasper", "Niagara Falls", "Waterloo", "Burlington", "Oakville"];
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function closestCity(name) {
+  const n = name.toLowerCase();
+  let best = null, bestD = 3;
+  for (const c of KNOWN_CITIES) { const dist = editDistance(n, c.toLowerCase()); if (dist < bestD) { best = c; bestD = dist; } }
+  return best && best.toLowerCase() !== n && (n.length >= 5 || bestD === 1) ? best : null;
+}
+
 async function weatherFor(name) {
-  const geo = async (extra) => (await getJson(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=${encodeURIComponent(name)}${extra}`)).results?.[0];
-  const place = (await geo("&countryCode=CA")) || (await geo(""));
+  const geo = async (q, extra) => (await getJson(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=${encodeURIComponent(q)}${extra}`)).results?.[0];
+  const fixed = closestCity(name);
+  const place = (await geo(name, "&countryCode=CA")) || (fixed && (await geo(fixed, "&countryCode=CA"))) || (await geo(name, ""));
   if (!place) return null;
   const w = await getJson(
     `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
@@ -239,7 +262,11 @@ function buildSearchPrompt(kind, data, links, guessedPlace, now = new Date()) {
 
 // Safe wrapper: if search fails, Maple still answers normally.
 // Returns { prompt, links, kind } or null. links = what the app shows under the answer (often none).
+// Questions about us are answered from COMPANY_FACTS (functions/prompts.js), never from the web.
+const ABOUT_US_RE = /(?<![\p{L}])(articx|articxai|ar?ticx|maple|ailix|janas|visvanathan)(?![\p{L}])/iu;
+
 async function getSearchContext(question) {
+  if (ABOUT_US_RE.test(question) && !WEATHER_RE.test(question)) return null;
   if (!needsSearch(question) && !WEATHER_RE.test(question)) return null;
   let kind = kindOf(question);
   try {
