@@ -7,6 +7,7 @@ import Avatar, { resizeImage } from "../components/Avatar";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { btn, iconBtn } from "../components/ui";
 import { useLang } from "../i18n";
+import { AddMethodPage, InvoicesPage, MethodsPage, NavRow, methodLabel, useBilling } from "./BillingPages";
 
 const LANGS = [["en", "English"], ["fr", "Français"]];
 const SECTIONS = [["general", GearIcon], ["account", UserIcon], ["privacy", ShieldIcon], ["usage", GaugeIcon], ["billing", CardIcon]];
@@ -273,8 +274,24 @@ function Usage({ t, usage, lang, fb, user }) {
 }
 
 function Billing({ t, lang, fb, user }) {
+  const [page, setPage] = useState(null); // null | "methods" | "add" | "invoices"
+  const [toast, setToast] = useState(null);
+  const billing = useBilling(fb);
+  const b = { ...t.bill, noInvoices: t.noInvoices };
+  const back = (to = null) => () => setPage(to);
+  if (page === "methods") return <MethodsPage b={b} fb={fb} billing={billing} onBack={back()} onAdd={back("add")} />;
+  if (page === "add") {
+    return <AddMethodPage b={b} fb={fb} lang={lang} billing={billing} onBack={back("methods")}
+      onSaved={() => { billing.reload(); setPage("methods"); setToast(b.saved); setTimeout(() => setToast(null), 2600); }} />;
+  }
+  if (page === "invoices") return <InvoicesPage b={b} lang={lang} billing={billing} onBack={back()} />;
+
+  const data = billing.data;
+  const def = data?.methods?.find((m) => m.isDefault) || data?.methods?.[0];
+  const loadingHint = billing.status === "loading" ? b.loading : null;
   return (
     <>
+      {toast && <p role="status" className="m-0 mb-3 rounded-[10px] bg-lake-soft px-3 py-2 text-[.86rem] text-ink">{toast}</p>}
       <h3 className={heading}>{t.sections.billing}</h3>
       <div className="mt-3 rounded-xl border border-line bg-bg-2 p-4">
         <div className="flex items-start justify-between gap-3">
@@ -291,8 +308,8 @@ function Billing({ t, lang, fb, user }) {
         </ul>
       </div>
       <div className="mt-2">
-        <Row label={t.payment} hint={t.noPayment} />
-        <Row label={t.invoices} hint={t.noInvoices} />
+        <NavRow label={t.payment} hint={loadingHint || (def ? methodLabel(b, def) : t.noPayment)} onClick={back("methods")} />
+        <NavRow label={t.invoices} hint={loadingHint || (data?.invoices?.length ? b.invoiceCount(data.invoices.length) : t.noInvoices)} onClick={back("invoices")} />
       </div>
       <PlanOptions t={t} lang={lang} fb={fb} user={user} />
     </>

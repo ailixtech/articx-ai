@@ -20,6 +20,8 @@ initializeApp();
 Object.assign(exports, require("./auth"));
 // Public share links for chats.
 Object.assign(exports, require("./share"));
+// Payment methods and invoices (Stripe).
+Object.assign(exports, require("./billing"));
 // Emails thumbs-down reports to the team.
 Object.assign(exports, require("./feedback"));
 // Waitlist sign-ups from /waitlist.

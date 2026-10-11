@@ -11,6 +11,7 @@ rules_version = '2';
 //          feedback/{id}                                    { uid, chatId, rating, reason, details, prompt, reply, createdAt }
 //          waitlist/{sha256(email)}                         { firstName, email, province, language, consent, consentAt, consentVersion, source, status, createdAt } (server only)
 //          stats/waitlist                                   { count, updatedAt } (public count on /waitlist; written by the countWaitlist function)
+//          billing/{uid}                                    { customerId, createdAt } (Stripe customer; server only)
 // Everything else (other usage/, otp/, throttle/, waitlist/ written by Cloud Functions) is denied to browsers.
 service cloud.firestore {
   match /databases/{database}/documents {
