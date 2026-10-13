@@ -642,6 +642,19 @@ for (const file of ["./train-immigration", "./train-tax-finance", "./train-gener
   for (const e of require(file)) for (const q of e.q) qa(q, e.a, `${e.topic}-${e.lang}`);
 }
 
+// Key facts (scripts/train-keyfacts.js): the facts Maple must never get wrong, asked many ways.
+// `use` reuses an answer from the subject files, so each fact has exactly one wording.
+const ALL_KNOWLEDGE = ["./train-immigration", "./train-tax-finance", "./train-general"].flatMap((f) => require(f));
+for (const e of require("./train-keyfacts")) {
+  let { a, lang, topic } = e;
+  if (e.use) {
+    const src = ALL_KNOWLEDGE.find((k) => k.q.includes(e.use));
+    if (!src) throw new Error(`train-keyfacts: no answer found for "${e.use}"`);
+    ({ a, lang, topic } = src);
+  }
+  for (const q of e.q) qa(q, a, `keyfact-${topic}-${lang}`);
+}
+
 // Step-by-step math with verification (includes the corrected Hagen–Poiseuille example).
 [
   ["Solve the Hagen–Poiseuille pipe-flow equation (1/r) d/dr(r du/dr) = (1/μ)(dp/dx), with finite velocity at r = 0 and u(R) = 0, and check the sign.",
@@ -695,7 +708,8 @@ function typo(text) {
 }
 const typoSource = examples.filter((e) => e.messages.length === 3 && !/^(math)$/.test(e.tag));
 for (let i = typoSource.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [typoSource[i], typoSource[j]] = [typoSource[j], typoSource[i]]; }
-for (const e of typoSource.slice(0, 120)) {
+const TYPO_N = 600;
+for (const e of typoSource.slice(0, TYPO_N)) {
   const [sys, user, reply] = e.messages;
   examples.push({ tag: `typo-${e.tag}`, messages: [sys, { role: "user", content: typo(user.content) }, reply] });
 }
@@ -706,6 +720,37 @@ for (let i = 0; i < 15; i++) {
   const q = pick([`wether in ${bad} today`, `whats the weather ${bad}`, `is it raning in ${bad}`, `${bad} forcast`, `how cold is it in ${bad} rn`]);
   const a = `Right now in ${city} it's ${c.temperature_2m}°C with ${nowEn(w.nowCond)} (feels like ${c.apparent_temperature}°C). Today's high is ${d.hi}°C and the low is ${d.lo}°C, with a ${d.prob}% chance of ${precipEn(d)}.`.replace(/ a (8\d|8|11|18)% /, " an $1% ") + ` ${tipEn(d, w.wind)}`;
   add(searchSystem(buildSearchPrompt("weather", w.text, [], false, now)), [{ role: "user", content: q }, { role: "assistant", content: a }], "typo-weather");
+}
+
+// ============================================================
+// N. Extra phrasings: every knowledge question again, asked casually (same correct answer).
+//    Key facts get 4 extra phrasings and immigration 2, so the facts that matter most stick.
+// ============================================================
+const V_EN_PRE = ["quick q: ", "hey, ", "ok so ", "pls tell me ", "in canada, ", "question: ", "hi maple, ", "can u help: ", "so ", "real quick, "];
+const V_EN_POST = [" pls", " thx", " eh", " in canada", " rn", " asap", " lol", " please", " tysm"];
+const V_FR_PRE = ["petite question : ", "salut, ", "allo, ", "dis-moi ", "svp, ", "bonjour maple, ", "ok fait que "];
+const V_FR_POST = [" svp", " stp", " merci", " au canada", " au québec"];
+function variant(q, fr) {
+  let t = q.replace(/[?.!]+$/, "");
+  if (rand() < 0.75) t = t.charAt(0).toLowerCase() + t.slice(1);
+  const P = fr ? V_FR_PRE : V_EN_PRE, S = fr ? V_FR_POST : V_EN_POST, r = rand();
+  if (r < 0.4) t = pick(P) + t; else if (r < 0.7) t = t + pick(S); else t = pick(P) + t + pick(S);
+  if (rand() < 0.5) t += "?";
+  if (fr && rand() < 0.3) t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // accents dropped, like fast typing
+  return t;
+}
+const seenQ = new Set(examples.map((e) => e.messages[1].content.toLowerCase().trim()));
+const KNOW_TAG = /^(keyfact-|immigration-|tax-|banking-|finance-|math-(en|fr)|science-|education-|jobs-|transport-|health-(en|fr)|technology-|companies-)/;
+const knowledge = examples.filter((e) => e.messages.length === 3 && KNOW_TAG.test(e.tag));
+for (const e of knowledge) {
+  const [sys, user, reply] = e.messages;
+  const n = e.tag.startsWith("keyfact-") ? 4 : e.tag.startsWith("immigration-") ? 2 : 1;
+  for (let k = 0, tries = 0; k < n && tries < 12; tries++) {
+    const v = variant(user.content, /-fr$/.test(e.tag)), key = v.toLowerCase().trim();
+    if (seenQ.has(key)) continue;
+    seenQ.add(key); k++;
+    examples.push({ tag: `var-${e.tag.replace(/-(en|fr)$/, "")}`, messages: [sys, { role: "user", content: v }, reply] });
+  }
 }
 
 // ============================================================

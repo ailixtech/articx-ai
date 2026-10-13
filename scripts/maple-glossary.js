@@ -367,7 +367,7 @@ module.exports = [
   ["char", "une voiture", "J'ai stationné mon char devant la maison.", "fr"],
   ["blonde", "une copine (peu importe la couleur des cheveux)", "Je vais au cinéma avec ma blonde.", "fr"],
   ["chum", "un copain, ou un ami", "Mon chum cuisine ce soir.", "fr"],
-  ["dépanneur", "un petit magasin de quartier (le « dep »)", "Je passe au dépanneur chercher du lait.", "fr"],
+  ["dépanneur", "un petit magasin de quartier, qu'on appelle aussi le dep", "Je passe au dépanneur chercher du lait.", "fr"],
   ["magasiner", "faire du shopping", "On va magasiner samedi?", "fr"],
   ["fin de semaine", "le week-end", "Bonne fin de semaine!", "fr"],
   ["courriel", "un e-mail", "Envoie-moi un courriel.", "fr"],
