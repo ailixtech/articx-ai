@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // scripts/build-maple-quick.js — builds the training set for Maple 0.5 Quick.
 //
-//   node scripts/build-maple-quick.js
+//   node scripts/build-maple-quick.js              -> Maple 0.5 Quick  (data/maple-quick/)
+//   node scripts/build-maple-quick.js --standard   -> Maple 0.5        (data/maple-0.5/)
+//
+// --standard uses the same facts and key facts, with the standard style, the longer answers in
+// scripts/train-detailed.js, and a train/valid split by fact (so val loss means something).
 //
 // Writes data/maple-quick/{train,valid,test}.jsonl in the chat format mlx_lm.lora reads
 // ({"messages":[{role,content},...]}). Every example uses the exact system prompts the
@@ -19,8 +23,10 @@ const path = require("node:path");
 const { SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, STYLES } = require("../functions/prompts");
 const { buildSearchPrompt, formatWeather } = require("../functions/search");
 
-const OUT = path.join(__dirname, "..", "data", "maple-quick");
-const STYLE = STYLES["maple-0.5-quick"];
+const STANDARD = process.argv.includes("--standard");
+const OUT = path.join(__dirname, "..", "data", STANDARD ? "maple-0.5" : "maple-quick");
+const STYLE = STYLES[STANDARD ? "maple-0.5" : "maple-0.5-quick"];
+const DETAILED = STANDARD ? require("./train-detailed") : { expand: [], longform: [] };
 
 // ---------- small helpers ----------
 let seed = 20261009;
@@ -642,6 +648,14 @@ for (const file of ["./train-immigration", "./train-tax-finance", "./train-gener
   for (const e of require(file)) for (const q of e.q) qa(q, e.a, `${e.topic}-${e.lang}`);
 }
 
+// Maple 0.5 only: long-form answers (scripts/train-detailed.js). Tagged like subject knowledge, so
+// they also get casual and typo variants below.
+const LONG_ANSWERS = new Set();
+for (const e of DETAILED.longform) {
+  LONG_ANSWERS.add(e.a);
+  for (const q of e.q) qa(q, e.a, `${e.topic}-${e.lang}`);
+}
+
 // Key facts (scripts/train-keyfacts.js): the facts Maple must never get wrong, asked many ways.
 // `use` reuses an answer from the subject files, so each fact has exactly one wording.
 const ALL_KNOWLEDGE = ["./train-immigration", "./train-tax-finance", "./train-general"].flatMap((f) => require(f));
@@ -744,7 +758,7 @@ const KNOW_TAG = /^(keyfact-|immigration-|tax-|banking-|finance-|math-(en|fr)|sc
 const knowledge = examples.filter((e) => e.messages.length === 3 && KNOW_TAG.test(e.tag));
 for (const e of knowledge) {
   const [sys, user, reply] = e.messages;
-  const n = e.tag.startsWith("keyfact-") ? 4 : e.tag.startsWith("immigration-") ? 2 : 1;
+  const n = e.tag.startsWith("keyfact-") ? 4 : LONG_ANSWERS.has(reply.content) ? 3 : e.tag.startsWith("immigration-") ? 2 : 1;
   for (let k = 0, tries = 0; k < n && tries < 12; tries++) {
     const v = variant(user.content, /-fr$/.test(e.tag)), key = v.toLowerCase().trim();
     if (seenQ.has(key)) continue;
@@ -754,11 +768,90 @@ for (const e of knowledge) {
 }
 
 // ============================================================
+// Maple 0.5 only: email/letter chats written by Qwen 2.5 7B (scripts/gen-emails-qwen.py), ONLY the
+// ones you marked "y" in data/emails-qwen/review.csv. Each gives 2 examples: the first email, and the
+// follow-up rewrite ("more polite", "shorter"...), so Maple learns to really change the draft.
+// ============================================================
+function readCsv(file) {
+  const text = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  const [head, ...body] = rows;
+  return body.filter((r) => r.length > 1).map((r) => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] || "").trim()])));
+}
+const EMAIL_CSV = path.join(__dirname, "..", "data", "emails-qwen", "review.csv");
+if (STANDARD && fs.existsSync(EMAIL_CSV)) {
+  const kept = readCsv(EMAIL_CSV).filter((r) => /^(y|yes|1|x|✓)$/i.test(r.keep) && r.user1 && r.reply1);
+  for (const r of kept) {
+    const tag = `email-${r.lang || "en"}`;
+    add(plainSystem(), [{ role: "user", content: r.user1 }, { role: "assistant", content: r.reply1 }], tag);
+    if (r.user2 && r.reply2) add(plainSystem(), [{ role: "user", content: r.user1 }, { role: "assistant", content: r.reply1 },
+      { role: "user", content: r.user2 }, { role: "assistant", content: r.reply2 }], tag);
+  }
+  console.log(`Emails (Qwen, reviewed): ${kept.length} kept from ${path.relative(process.cwd(), EMAIL_CSV)}`);
+}
+
+// ============================================================
+// Maple 0.5 only: swap short Quick answers for the longer ones (every copy: phrasings, typos, slang)
+// ============================================================
+if (STANDARD) {
+  for (const [q, long] of DETAILED.expand) {
+    const src = examples.find((e) => e.messages[1].content === q);
+    if (!src) throw new Error(`train-detailed: question not found in the data: "${q}"`);
+    const short = src.messages[2].content;
+    let n = 0;
+    for (const e of examples) {
+      const r = e.messages[e.messages.length - 1];
+      if (r.content === short) { e.messages[e.messages.length - 1] = { role: "assistant", content: long }; n++; }
+    }
+    if (!n) throw new Error(`train-detailed: nothing replaced for "${q}"`);
+  }
+}
+
+// ============================================================
 // Write train / valid / test
 // ============================================================
 for (let i = examples.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [examples[i], examples[j]] = [examples[j], examples[i]]; }
-const nValid = Math.round(examples.length * 0.08), nTest = Math.round(examples.length * 0.04);
-const splits = { valid: examples.slice(0, nValid), test: examples.slice(nValid, nValid + nTest), train: examples.slice(nValid + nTest) };
+let splits;
+if (!STANDARD) {
+  const nValid = Math.round(examples.length * 0.08), nTest = Math.round(examples.length * 0.04);
+  splits = { valid: examples.slice(0, nValid), test: examples.slice(nValid, nValid + nTest), train: examples.slice(nValid + nTest) };
+} else {
+  // Split by fact: every example sharing an answer goes to the same split, so valid/test answers are
+  // never seen in training. Critical facts (identity, key facts, emergencies, immigration, money,
+  // health) and the long-form answers always stay in train.
+  const CRITICAL = /identity|keyfact|emergency|immigration|tax|banking|finance|health|email/;
+  const groups = new Map();
+  for (const e of examples) {
+    const k = e.messages[e.messages.length - 1].content;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(e);
+  }
+  const train = [], held = [];
+  // v2: cap repeats of ordinary answers at 3 (phrasings/typos of the same answer made v1 memorize and
+  // forget what the base model already knew, e.g. "capital of Alberta: Calgary"). Key facts and
+  // emergencies keep every copy; long-form answers keep 6 so the detailed style still sticks.
+  const KEEP_ALL = /keyfact|emergency/;
+  for (const [k, g] of groups) {
+    const cap = g.some((e) => KEEP_ALL.test(e.tag)) ? g.length : LONG_ANSWERS.has(k) ? 6 : 3;
+    g.splice(cap);
+    (LONG_ANSWERS.has(k) || g.some((e) => CRITICAL.test(e.tag)) ? train : held).push(g);
+  }
+  const valid = [], test = [], nValid = Math.round(examples.length * 0.06), nTest = Math.round(examples.length * 0.03);
+  for (const g of held) {
+    if (valid.length < nValid) valid.push(...g); else if (test.length < nTest) test.push(...g); else train.push(g);
+  }
+  splits = { valid, test, train: train.flat() };
+  for (let i = splits.train.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [splits.train[i], splits.train[j]] = [splits.train[j], splits.train[i]]; }
+}
 
 fs.mkdirSync(OUT, { recursive: true });
 for (const [name, rows] of Object.entries(splits)) {

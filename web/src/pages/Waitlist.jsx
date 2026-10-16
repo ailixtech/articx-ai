@@ -96,7 +96,7 @@ function JoinForm({ w, lang, onJoined }) {
   const id = useId();
   const refs = { firstName: useRef(null), email: useRef(null), province: useRef(null), consent: useRef(null) };
   const doneRef = useRef(null);
-  const [form, setForm] = useState({ firstName: "", email: "", province: "", consent: false, website: "" });
+  const [form, setForm] = useState({ firstName: "", email: "", organization: "", province: "", consent: false, website: "" });
   const [errors, setErrors] = useState({}); // field -> key of f.errors
   const [formError, setFormError] = useState(null); // throttled | server | network
   const [status, setStatus] = useState("idle"); // idle | sending | done
@@ -116,7 +116,7 @@ function JoinForm({ w, lang, onJoined }) {
   async function submit(e) {
     e.preventDefault();
     if (status === "sending") return;
-    const data = { ...form, firstName: form.firstName.trim(), email: form.email.trim() };
+    const data = { ...form, firstName: form.firstName.trim(), email: form.email.trim(), organization: form.organization.trim() };
     const errs = {};
     if (!data.firstName) errs.firstName = "firstName";
     if (!EMAIL_RE.test(data.email)) errs.email = "email";
@@ -160,7 +160,7 @@ function JoinForm({ w, lang, onJoined }) {
           {w.done.text} <strong className="font-semibold break-all text-white">{form.email}</strong>
         </p>
         <p className="mt-2 mb-0 text-[.88rem] text-[#8FA4B3]">{w.done.note}</p>
-        <button type="button" onClick={() => { setForm({ firstName: "", email: "", province: "", consent: false, website: "" }); setStatus("idle"); }}
+        <button type="button" onClick={() => { setForm({ firstName: "", email: "", organization: "", province: "", consent: false, website: "" }); setStatus("idle"); }}
           className="mt-6 cursor-pointer rounded-full border border-white/15 bg-transparent px-5 py-2.5 font-body text-[.9rem] font-medium text-[#C3D2DC] hover:border-white/35 hover:text-white">
           {w.done.again}
         </button>
@@ -174,7 +174,7 @@ function JoinForm({ w, lang, onJoined }) {
 
   return (
     <form onSubmit={submit} noValidate aria-label={f.label}>
-      <div className="grid gap-4 md:grid-cols-[1fr_1.35fr_1.25fr]">
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label htmlFor={`${id}-firstName`} className={label}>{f.firstName}</label>
           <input ref={refs.firstName} id={`${id}-firstName`} name="given-name" autoComplete="given-name" autoCapitalize="words" maxLength={60} required
@@ -190,6 +190,12 @@ function JoinForm({ w, lang, onJoined }) {
             aria-invalid={!!errors.email || undefined} aria-describedby={describedBy("email")}
             className={`${field} ${fieldBorder(errors.email)}`} />
           {err("email")}
+        </div>
+        <div>
+          <label htmlFor={`${id}-organization`} className={label}>{f.organization} <span className="font-normal text-white/50">{f.optional}</span></label>
+          <input id={`${id}-organization`} name="organization" autoComplete="organization" maxLength={120}
+            placeholder={f.organizationPlaceholder} value={form.organization} onChange={(e) => set("organization", e.target.value)}
+            className={`${field} ${fieldBorder(false)}`} />
         </div>
         <div>
           <label htmlFor={`${id}-province`} className={label}>{f.province}</label>

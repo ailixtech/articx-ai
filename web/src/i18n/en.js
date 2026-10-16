@@ -133,6 +133,9 @@ const en = {
       firstNamePlaceholder: "Alex",
       email: "Email",
       emailPlaceholder: "you@example.ca",
+      organization: "College, university or organization",
+      organizationPlaceholder: "University of Toronto",
+      optional: "(optional)",
       province: "Province or territory",
       provincePlaceholder: "Choose one",
       // Changing this sentence? Bump CONSENT_VERSION in functions/waitlist.js.
@@ -157,7 +160,7 @@ const en = {
       title: "Waitlist privacy",
       intro: "This notice covers only the ARTICX waitlist: what we keep when you join, and why.",
       sections: [
-        ["What we collect", "Your first name, email address, province or territory, the language you used, and the date and time you agreed to receive your invite. To stop spam, we also keep a scrambled (hashed) version of your network address, never the address itself."],
+        ["What we collect", "Your first name, email address, college, university or organization (if you give one), province or territory, the language you used, and the date and time you agreed to receive your invite. To stop spam, we also keep a scrambled (hashed) version of your network address, never the address itself."],
         ["Why", "To email you your invite when ARTICX launches, to greet you by name, and to see which provinces and territories are interested so we can plan the launch. We only email you because you ticked the box."],
         ["Where it's stored", "In Google Cloud's Toronto region, in Canada."],
         ["Who sees it", "Only the ARTICX team. We never sell your details or share them with advertisers."],
@@ -234,6 +237,7 @@ const en = {
     send: "Send message",
     stop: "Stop generating",
     ideas: "Ideas to try",
+    trending: "Trending:",
     starters: [
       "Compare a TFSA and an RRSP",
       "Help me make a monthly budget",

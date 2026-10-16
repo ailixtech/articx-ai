@@ -11,6 +11,8 @@ const SEARCH_WORDS = [
   // things that change often
   "today", "tonight", "yesterday", "tomorrow", "latest", "current", "currently", "right now",
   "news", "recent", "recently", "this week", "this month", "this year", "last night",
+  "trending", "trend", "trends", "viral", "happening", "going on", "headlines", "breaking",
+  "highway", "hwy", "traffic", "road closure", "road closures", "closed",
   "price", "prices", "cost", "costs", "rate", "rates", "interest rate", "exchange rate",
   "stock", "stocks", "weather", "forecast", "score", "scores", "who won", "standings",
   "election", "poll", "update", "updates", "release date", "released", "open now", "hours",
@@ -20,15 +22,19 @@ const SEARCH_WORDS = [
   "leader", "who is the",
   // government & rules
   "immigration", "visa", "permit", "pr card", "permanent resident", "citizenship",
+  "pr", "pathway", "pathways", "immigrate", "francophone", "pnp", "oinp", "sponsorship", "sponsor",
+  "tfsa", "rrsp", "fhsa", "resp", "rrif", "contribution room", "contribution limit", "celi", "reer", "celiapp",
   "express entry", "ircc", "crs", "crs score", "noc", "teer", "lmia", "pgwp", "work permit", "study permit",
   "processing time", "processing times", "fee", "fees", "points", "tax", "taxes", "benefit", "benefits", "ei", "cpp", "oas", "health card",
   "driver's licence", "drivers license", "law", "rule", "rules", "deadline",
   // French
   "aujourd'hui", "hier", "demain", "actuel", "actuellement", "dernières", "nouvelles",
   "prix", "météo", "permis", "impôt", "impôts", "élection", "premier ministre",
+  "tendance", "tendances", "en ce moment", "immigrer", "résidence permanente", "rp", "parrainage",
 ];
 const IMMIGRATION_WORDS = [
-  "immigration", "visa", "permit", "pr card", "permanent resident",
+  "immigration", "visa", "permit", "pr card", "permanent resident", " pr ", "pathway", "immigrate",
+  "francophone", "pnp", "oinp", "sponsor", "immigrer", "résidence permanente",
   "citizenship", "express entry", "ircc", "refugee", "permis",
   "crs", "noc", "teer", "lmia", "pgwp", "work permit", "study permit",
 ];
@@ -37,6 +43,21 @@ const IMMIGRATION_WORDS = [
 const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const SEARCH_RE = new RegExp(`(^|[^\\p{L}])(${SEARCH_WORDS.map(esc).join("|")})(?=$|[^\\p{L}])`, "iu");
 
+// Fast typing: "trenindg", "imigration", "hihgway"… fix words that are 1–2 letters off a trigger word.
+const FUZZY_WORDS = ["trending", "happening", "latest", "news", "headlines", "breaking", "immigration", "citizenship",
+  "permanent", "resident", "permit", "pathway", "highway", "traffic", "forecast", "weather", "election", "tendance", "nouvelles"];
+function fixTypos(question) {
+  return question.replace(/\p{L}{4,}/gu, (w) => {
+    const lw = w.toLowerCase();
+    if (FUZZY_WORDS.includes(lw)) return w;
+    for (const t of FUZZY_WORDS) {
+      if (Math.abs(t.length - lw.length) > 2 || lw[0] !== t[0]) continue;
+      if (editDistance(lw, t) <= (t.length >= 6 ? 2 : 1)) return t;
+    }
+    return w;
+  });
+}
+
 function needsSearch(question) {
   const q = question.toLowerCase();
   return SEARCH_RE.test(q) || /\b20\d\d\b/.test(q);
@@ -44,12 +65,14 @@ function needsSearch(question) {
 
 // What kind of question is it? Decides where to look and whether to show links.
 const WEATHER_RE = /(?<![\p{L}'])(weather|wether|wheather|weathr|waether|forecast|forcast|forecst|temperature|temprature|tempature|rain|raining|rainy|raning|snow|snowing|snowng|snowy|sno|humid|humidity|météo|meteo|mété|prévisions?|previsions?|température|temperature|pluie|neige)(?![\p{L}])/iu;
-const NEWS_RE = /(?<![\p{L}'])(news|headlines?|breaking|latest on|what happened|nouvelles|actualités?)(?![\p{L}])/iu;
+const NEWS_RE = /(?<![\p{L}'])(news|headlines?|breaking|latest on|what happened|trending|trends?|viral|happening|going on|nouvelles|actualités?|tendances?)(?![\p{L}])/iu;
+// Roads: real road names and closures change and a small model invents them, so always look them up.
+const ROAD_RE = /(?<![\p{L}])(highway|hwy|route|road|traffic|autoroute)(?![\p{L}])/iu;
 // "Where is it snowing?", "which provinces got snow?" → look for reports, not one city's forecast.
 const WHERE_RE = /(?<![\p{L}])(where|which (city|cities|province|provinces|places?|areas?|regions?)|anywhere|first snow|où|quelles? (villes?|provinces?|régions?))(?![\p{L}])/iu;
 const CANADA_RE = /(?<![\p{L}])(canada|across the country|au canada|partout)(?![\p{L}])/iu;
 function kindOf(question) {
-  const q = question.toLowerCase();
+  const q = ` ${question.toLowerCase()} `;
   if (WEATHER_RE.test(q) && (WHERE_RE.test(q) || CANADA_RE.test(q))) return "scan";
   if (WEATHER_RE.test(q)) return "weather";
   if (IMMIGRATION_WORDS.some((w) => q.includes(w)) || OFFICIAL_RE.test(q)) return "official";
@@ -57,7 +80,7 @@ function kindOf(question) {
   return "general";
 }
 // Topics where an official link really helps the user (rules, forms, deadlines).
-const OFFICIAL_RE = /(?<![\p{L}'])(tax|taxes|impôts?|benefits?|ei|cpp|oas|ccb|gst|hst|health card|ohip|driver'?s? licen[cs]e|permis de conduire|law|laws|legal|loi|deadline|application|apply|form|passport|passeport|sin)(?![\p{L}])/iu;
+const OFFICIAL_RE = /(?<![\p{L}'])(tfsa|rrsp|fhsa|resp|celi|reer|celiapp|tax|taxes|impôts?|benefits?|ei|cpp|oas|ccb|gst|hst|health card|ohip|driver'?s? licen[cs]e|permis de conduire|law|laws|legal|loi|deadline|application|apply|form|passport|passeport|sin)(?![\p{L}])/iu;
 
 // 2a. Weather: live data from Open-Meteo (free, no key), so Maple can say the actual numbers.
 const WMO = {
@@ -200,6 +223,10 @@ async function tavilySearch(question, kind) {
     include_answer: "advanced",
   };
   if (kind === "news") { body.topic = "news"; body.time_range = "week"; }
+  // Maple is for Canadians: unless another place is named, look for Canadian results.
+  if ((kind === "news" || kind === "general") && !/(canada|canadian|ontario|quebec|québec|toronto|montreal|montréal|vancouver|calgary|ottawa|alberta|manitoba|saskatchewan|nova scotia|brunswick|newfoundland|yukon|nunavut|territories|\bbc\b|\bu\.?s\.?a?\b|united states|america|uk|india|china|europe|world|international|global)/i.test(question)) {
+    body.query = `${body.query} Canada`;
+  }
   if (kind === "official" && IMMIGRATION_WORDS.some((w) => question.toLowerCase().includes(w))) {
     body.include_domains = ["canada.ca"];
   }
@@ -265,7 +292,17 @@ function buildSearchPrompt(kind, data, links, guessedPlace, now = new Date()) {
 // Questions about us are answered from COMPANY_FACTS (functions/prompts.js), never from the web.
 const ABOUT_US_RE = /(?<![\p{L}])(articx|articxai|ar?ticx|maple|ailix|janas|visvanathan)(?![\p{L}])/iu;
 
-async function getSearchContext(question) {
+// Short follow-ups ("for news?", "what about Quebec?", "and tomorrow?") mean nothing on their own:
+// search with the previous question too.
+const FOLLOW_UP_RE = /^(for|and|what about|how about|about|also|ok|okay|so|then|in|et|pour|puis|alors|sinon)\b/iu;
+function withContext(question, previous) {
+  if (!previous) return question;
+  const words = question.trim().split(/\s+/).length;
+  return words <= 4 || FOLLOW_UP_RE.test(question.trim()) ? `${previous.trim()} ${question.trim()}` : question;
+}
+
+async function getSearchContext(question, previous = "") {
+  question = fixTypos(withContext(question, previous));
   if (ABOUT_US_RE.test(question) && !WEATHER_RE.test(question)) return null;
   if (!needsSearch(question) && !WEATHER_RE.test(question)) return null;
   let kind = kindOf(question);
@@ -280,6 +317,7 @@ async function getSearchContext(question) {
     }
     // Weather asked without a city we could find, e.g. "snowing in canada": search reports instead.
     if (!found && kind === "weather" && placesFrom(question).length) kind = "news";
+    if (!found && ROAD_RE.test(question) && kind === "general") kind = "official";
     if (!found) {
       if (!TAVILY_API_KEY.value()) {
         console.error("Search skipped: TAVILY_API_KEY secret is empty or not set");
@@ -297,4 +335,4 @@ async function getSearchContext(question) {
   }
 }
 
-module.exports = { TAVILY_API_KEY, getSearchContext, buildSearchPrompt, formatWeather, WMO };
+module.exports = { TAVILY_API_KEY, getSearchContext, buildSearchPrompt, formatWeather, WMO, needsSearch, kindOf, withContext, fixTypos, tavilySearch };

@@ -26,6 +26,11 @@ v4 val loss was noisy (0.118 at 12k, 0.204 at 14k) because valid shares paraphra
 - `mlx_lm.server --model ./models/maple-0.5-quick --port 8080` + cloudflared tunnel → MODEL_API_URL_QUICK in functions/.env.articx-ai-dev
 - Maple 0.5 (standard) still on base Qwen 2.5 7B via Ollama (not fine-tuned yet).
 
+## PLAN (agreed Oct 12, 23:30)
+1. **Tomorrow:** test Quick v4 on the dev site (fix serving first: run start-dev-model.sh for Ollama, fill MODEL_NAME_QUICK=default_model + MODEL_API_URL_QUICK=<8080 tunnel>/v1 in functions/.env.articx-ai-dev, deploy functions:chat).
+2. **Then Maple 0.5 standard:** go through v1 → v2 → v3 → v4 the same way we did Quick (build "detailed" dataset with longer answers from the same facts + key facts, train, test with test script, pick best checkpoint).
+3. **v5 for both after that:** Quick v5 (slang fix, fact-based split) + Maple 0.5 v5. Note: on the 24 GB Mac only one training can run at a time, so "same time" = same round, trained back to back (e.g. one per night), with servers stopped during training.
+
 ## Next
 - [ ] v5: `node scripts/build-maple-quick.js` (includes slang key facts), train `maple-0.5-quick-v5`, 14,000 steps, overnight. Stop the MLX server + Ollama first (memory).
 - [ ] v5: split train/valid by fact, so val loss is meaningful.

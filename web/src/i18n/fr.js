@@ -133,6 +133,9 @@ const fr = {
       firstNamePlaceholder: "Alex",
       email: "Courriel",
       emailPlaceholder: "vous@exemple.ca",
+      organization: "Cégep, université ou organisation",
+      organizationPlaceholder: "Université de Montréal",
+      optional: "(facultatif)",
       province: "Province ou territoire",
       provincePlaceholder: "Choisissez",
       // Vous modifiez cette phrase? Changez CONSENT_VERSION dans functions/waitlist.js.
@@ -157,7 +160,7 @@ const fr = {
       title: "Confidentialité de la liste d'attente",
       intro: "Cet avis porte uniquement sur la liste d'attente d'ARTICX : ce que nous conservons quand vous vous inscrivez, et pourquoi.",
       sections: [
-        ["Ce que nous recueillons", "Votre prénom, votre adresse courriel, votre province ou territoire, la langue utilisée, ainsi que la date et l'heure de votre consentement à recevoir votre invitation. Pour bloquer le pourriel, nous conservons aussi une version brouillée (hachée) de votre adresse réseau, jamais l'adresse elle-même."],
+        ["Ce que nous recueillons", "Votre prénom, votre adresse courriel, votre cégep, université ou organisation (si vous l'indiquez), votre province ou territoire, la langue utilisée, ainsi que la date et l'heure de votre consentement à recevoir votre invitation. Pour bloquer le pourriel, nous conservons aussi une version brouillée (hachée) de votre adresse réseau, jamais l'adresse elle-même."],
         ["Pourquoi", "Pour vous envoyer votre invitation au lancement d'ARTICX, vous saluer par votre prénom et savoir quelles provinces et quels territoires sont intéressés afin de planifier le lancement. Nous vous écrivons seulement parce que vous avez coché la case."],
         ["Où ils sont stockés", "Dans la région de Toronto de Google Cloud, au Canada."],
         ["Qui y a accès", "Seulement l'équipe d'ARTICX. Nous ne vendons jamais vos renseignements et ne les partageons pas avec des annonceurs."],
@@ -234,6 +237,7 @@ const fr = {
     send: "Envoyer le message",
     stop: "Arrêter la réponse",
     ideas: "Idées à essayer",
+    trending: "Tendance :",
     starters: [
       "Compare un CELI et un REER",
       "Aide-moi à faire un budget mensuel",

@@ -5,12 +5,14 @@ import PastedCard from "./PastedCard";
 import { CONFIG } from "../config";
 import { isLongPaste, joinPasted } from "../lib/pasted";
 import { useLang } from "../i18n";
+import useStarters from "./useStarters";
 
 const touch = () => matchMedia("(pointer: coarse)").matches;
 
 export default function Composer({ value, onChange, pastes, onPastes, onSubmit, onStop, streaming, empty, isGuest, guestLeft, inputRef, model, onModel, onSignUp }) {
-  const { s } = useLang();
+  const { s, lang } = useLang();
   const t = s.chat;
+  const starters = useStarters(lang, t.starters);
   // Grow with the text, up to 220px.
   useEffect(() => {
     const el = inputRef.current;
@@ -69,10 +71,12 @@ export default function Composer({ value, onChange, pastes, onPastes, onSubmit, 
       </div>
       {empty && (
         <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label={t.ideas}>
-          {t.starters.map((x) => (
-            <button key={x} type="button" onClick={() => onSubmit(x)}
-              className="cursor-pointer rounded-full border border-line bg-transparent px-[.95rem] py-2 text-[.88rem] font-medium text-muted hover:border-lake hover:bg-surface hover:text-ink">
-              {x}
+          {starters.map((c) => (
+            <button key={c.label} type="button" onClick={() => onSubmit(c.prompt)} title={c.prompt}
+              className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-line bg-transparent px-[.95rem] py-2 text-left text-[.88rem] font-medium text-muted hover:border-lake hover:bg-surface hover:text-ink">
+              {c.kind !== "fixed" && <span aria-hidden="true">{{ weather: "🌦️", trending: "🔥", popular: "📈" }[c.kind]}</span>}
+              {c.kind === "trending" && <span className="sr-only">{t.trending} </span>}
+              <span className="truncate">{c.label}</span>
             </button>
           ))}
         </div>

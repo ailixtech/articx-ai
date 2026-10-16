@@ -30,6 +30,7 @@ Object.assign(exports, require("./waitlist"));
 // Weekly topic counts for the homepage (no message text is stored).
 const { countTopic, topics, weekOf } = require("./topics");
 exports.topics = topics;
+exports.starters = require("./starters").starters;
 
 // Secrets (set with: firebase functions:secrets:set NAME)
 const MODEL_API_URL = defineSecret("MODEL_API_URL"); // e.g. https://model.example.ca/v1
@@ -232,7 +233,9 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
     // Emergencies get an emergency-first answer and skip web search.
     const emergency = lastUser ? emergencyKind(lastUser.content) : null;
     if (emergency) logger.warn("Emergency message detected", { kind: emergency });
-    const search = lastUser && !emergency ? await getSearchContext(lastUser.content) : null;
+    const userTurns = messages.filter((m) => m.role === "user");
+    const previousUser = userTurns.length > 1 ? userTurns[userTurns.length - 2].content : "";
+    const search = lastUser && !emergency ? await getSearchContext(lastUser.content, previousUser) : null;
     if (search) logger.info("Web search used", { kind: search.kind, results: search.sources.length, links: search.links.length });
 
     // 4. Forward to the model server and stream the reply back.

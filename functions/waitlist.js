@@ -2,7 +2,7 @@
  * Waitlist sign-ups from /waitlist (POST /api/waitlist, a Hosting rewrite, so same origin).
  *
  * One document per email address: waitlist/{sha256(lowercased email)} with { firstName, email,
- * province, language, consent, consentAt, consentVersion, source, status, createdAt }.
+ * organization, province, language, consent, consentAt, consentVersion, source, status, createdAt }.
  * Browsers can't read or write the collection (firestore.rules); only this function and
  * the admin panel can. A second sign-up with the same email changes nothing, and the
  * reply is the same either way, so the form can't be used to test addresses.
@@ -51,6 +51,7 @@ exports.waitlist = onRequest(
 
     const firstName = str(b.firstName, 60);
     const email = str(b.email, 254).toLowerCase();
+    const organization = str(b.organization, 120); // optional
     const province = PROVINCES.includes(b.province) ? b.province : "";
     if (!firstName) return res.status(400).json({ error: "firstName" });
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "email" });
@@ -66,6 +67,7 @@ exports.waitlist = onRequest(
         tx.create(ref, {
           firstName,
           email,
+          organization,
           province,
           language: b.language === "fr" ? "fr" : "en",
           consent: true,
