@@ -103,7 +103,7 @@ export default function ChatPage() {
   tRef.current = T;
 
   const [authView, setAuthView] = useState({ step: null });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !mobile()); // open by default on desktop; only the user closes it
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -312,6 +312,7 @@ export default function ChatPage() {
       return;
     }
     setAuthView({ step: null });
+    if (!mobile()) setSidebarOpen(true);
     afterSignIn();
   }, [phase, uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -506,7 +507,6 @@ export default function ChatPage() {
 
     let id = chatIdRef.current;
     if (!asGuest && !id) {
-      setSidebarOpen(false); // a new chat gets the full width
       const ref = doc(chatsCol(u.uid));
       id = ref.id;
       setChatId(id);
@@ -531,12 +531,12 @@ export default function ChatPage() {
     const controller = new AbortController();
     controllerRef.current = controller;
     setStreaming(true);
-    let reply = "", sources = null, searched = false, aborted = false, queued = false, done = false, errorText = null, guestLimit = false;
+    let reply = "", sources = null, searched = false, langNote = null, aborted = false, queued = false, done = false, errorText = null, guestLimit = false;
     const paint = () => {
       queued = false;
       if (done || sessionRef.current !== my) return;
       stickRef.current = nearBottom();
-      setMessages((m) => replaceLast(m, { role: "assistant", content: reply, streaming: true }));
+      setMessages((m) => replaceLast(m, { role: "assistant", content: reply, streaming: true, ...(langNote ? { langNote } : {}) }));
     };
     try {
       await streamCompletion({
@@ -544,6 +544,15 @@ export default function ChatPage() {
         getToken: () => tokenFor(u),
         onToken: (tok) => { reply += tok; if (!queued) { queued = true; requestAnimationFrame(paint); } },
         onSources: (list, s) => { sources = cleanSources(list); searched = s; },
+        // "Still learning <language>" note: once per chat per browser session (closing the app and
+        // coming back later shows it once again). Stored in sessionStorage, so nothing leaves the device.
+        onNotice: (n) => {
+          if (typeof n.en !== "string") return;
+          const key = `maple.langNote.${id || "guest"}.${String(n.code || "").slice(0, 8)}`;
+          if (store("session", key)) return;
+          store("session", key, "1");
+          langNote = { text: String(n.text || "").slice(0, 600), en: n.en.slice(0, 400) };
+        },
       });
     } catch (e) {
       if (asGuest && e.status === 403) guestLimit = true;
@@ -566,7 +575,7 @@ export default function ChatPage() {
     }
     if (stillHere) {
       stickRef.current = nearBottom() || !!errorText;
-      setMessages((m) => (reply.trim() ? replaceLast(m, { role: "assistant", content: reply, ...(sources ? { sources } : {}), ...(searched ? { searched } : {}) }) : m.slice(0, -1)));
+      setMessages((m) => (reply.trim() ? replaceLast(m, { role: "assistant", content: reply, ...(sources ? { sources } : {}), ...(searched ? { searched } : {}), ...(langNote ? { langNote } : {}) }) : m.slice(0, -1)));
       if (errorText) setNotice(errorText);
       else if (!reply.trim() && !aborted && !guestLimit) setNotice(L.chat.errors.empty);
     }

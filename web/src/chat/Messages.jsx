@@ -143,11 +143,18 @@ function ReplyActions({ text, rating, onRate, onDislike, onToast, onShare }) {
   );
 }
 
-export function AssistantMessage({ content, streaming, rating, onRate, onDislike, onToast, onShare }) {
+export function AssistantMessage({ content, streaming, langNote, rating, onRate, onDislike, onToast, onShare }) {
   const { s } = useLang();
   return (
     <div className={row}>
       <div className="min-w-0">
+        {langNote && (
+          <div className="mb-[.6rem] rounded-[12px] border border-line bg-surface px-[.85rem] py-[.55rem] text-[.84rem] leading-[1.45] text-muted-strong">
+            <span aria-hidden="true">🌱 </span>
+            {langNote.text && <span className="block text-ink">{langNote.text}</span>}
+            <span className={langNote.text ? "mt-[.2rem] block text-[.78rem]" : ""} lang="en">{langNote.en}</span>
+          </div>
+        )}
         {streaming && !content ? (
           <p role="status" className="m-0 flex h-[30px] items-center font-head text-[.95rem] font-medium">
             <span className="thinking-text">{s.chat.thinking}</span>
@@ -174,7 +181,7 @@ export function MessageList({ messages, notice, listRef, gate, ratings = {}, onR
     }
     else {
       items.push(
-        <AssistantMessage key={i} content={m.content} streaming={m.streaming} rating={ratings[i]} onToast={onToast} onShare={onShare}
+        <AssistantMessage key={i} content={m.content} streaming={m.streaming} langNote={m.langNote} rating={ratings[i]} onToast={onToast} onShare={onShare}
           onRate={onRate && ((r) => onRate(i, r))} onDislike={onDislike && (() => onDislike(i))} />
       );
       if (m.sources?.length && !m.streaming) items.push(<Sources key={`s${i}`} list={m.sources} label={s.chat.sources} />);

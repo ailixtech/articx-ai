@@ -9,7 +9,7 @@ export class ModelError extends Error {
   }
 }
 
-export async function streamCompletion({ history, model, backend, cloudUrl, getToken, onToken, onSources, signal }) {
+export async function streamCompletion({ history, model, backend, cloudUrl, getToken, onToken, onSources, signal, onNotice }) {
   let url, body;
   const headers = { "Content-Type": "application/json" };
   if (backend === "cloud") {
@@ -53,6 +53,7 @@ export async function streamCompletion({ history, model, backend, cloudUrl, getT
       try { json = JSON.parse(data); } catch { continue; }
       if (json.error) throw new ModelError("stream", 0, json.error.message || String(json.error));
       if (Array.isArray(json.sources)) { onSources?.(json.sources, !!json.searched); continue; }
+      if (json.notice && typeof json.notice === "object") { onNotice?.(json.notice); continue; }
       const tok = json.choices?.[0]?.delta?.content;
       if (typeof tok === "string" && tok) onToken(tok);
     }

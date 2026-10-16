@@ -2,7 +2,8 @@
 // every chat grouped by date below. Search matches titles and the messages inside each chat
 // (loaded on the first search, then cached by the page). A click outside or Escape closes it.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChatIcon, CloseIcon, PenIcon, PinIcon, SearchIcon } from "../components/Icons";
+import { PiChatCircle } from "react-icons/pi";
+import { CloseIcon, PenIcon, PinIcon, SearchIcon } from "../components/Icons";
 import { iconBtn } from "../components/ui";
 import { useLang } from "../i18n";
 import { groupOf } from "./Sidebar";
@@ -119,7 +120,7 @@ export default function HistoryDialog({ chats, currentId, chatText, onPick, onNe
               <button key={r.chat.id} id={`history-${r.chat.id}`} data-i={r.i} type="button" role="option" aria-selected={r.i === active}
                 onMouseMove={() => setActive(r.i)} onClick={() => onPick(r.chat.id)}
                 className={`flex w-full cursor-pointer items-center gap-3 rounded-[12px] border-0 px-3 py-[.65rem] text-left text-[.93rem] text-ink ${r.i === active ? "bg-bg-2" : "bg-transparent"}`}>
-                <ChatIcon className="i size-[18px] flex-none text-muted" />
+                <PiChatCircle aria-hidden="true" className="size-[18px] flex-none text-muted" />
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate ${r.chat.id === currentId ? "font-semibold" : ""}`}>{r.chat.title}</span>
                   {query.length >= 2 && !r.chat.title.toLowerCase().includes(query) && texts[r.chat.id] && <Snippet text={texts[r.chat.id]} query={query} />}

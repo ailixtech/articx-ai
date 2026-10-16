@@ -29,6 +29,7 @@ Object.assign(exports, require("./waitlist"));
 
 // Weekly topic counts for the homepage (no message text is stored).
 const { countTopic, topics, weekOf } = require("./topics");
+const { detectLanguage, noticeFor, promptFor, countLanguage } = require("./language");
 exports.topics = topics;
 exports.starters = require("./starters").starters;
 
@@ -242,8 +243,12 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const controller = new AbortController();
     res.on("close", () => { if (!res.writableEnded) controller.abort(); });
 
+    // Languages other than English/French: honest "still learning" note + simpler replies.
+    const lang = lastUser ? detectLanguage(lastUser.content) : null;
+    if (lastUser) countLanguage(lang, weekOf(new Date()));
     const core = search ? SEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
-    const basePrompt = model.style ? `${core} ${model.style}` : core;
+    const styled = model.style ? `${core} ${model.style}` : core;
+    const basePrompt = lang ? `${styled}\n\n${promptFor(lang)}` : styled;
     const systemPrompt = emergency
       ? `${basePrompt}\n\n${EMERGENCY_PROMPT[emergency]}`
       : search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
@@ -274,6 +279,8 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
       res.status(200);
       res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
       res.flushHeaders();
+      // Sent with every such reply; the app shows it once per chat per session.
+      if (lang) res.write(`data: ${JSON.stringify({ notice: noticeFor(lang) })}\n\n`);
       // Pass the stream through line by line, counting the text (to log empty replies),
       // and hold back [DONE] so search links can be sent first as {"sources": [...]}.
       // The app shows those as real links, separate from the model's text.
