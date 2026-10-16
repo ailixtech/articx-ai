@@ -11,6 +11,9 @@ import Waitlist from "./pages/Waitlist";
 import { NotFound, Privacy, Terms } from "./pages/Legal";
 import { Boot } from "./chat/Boot";
 import { LangProvider } from "./i18n";
+import { applyTextSize } from "./lib/prefs";
+
+applyTextSize();
 
 // The chat (and Firebase with it) loads only when someone opens /chat.
 const ChatPage = lazy(() => import("./chat/ChatPage"));

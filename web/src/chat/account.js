@@ -1,9 +1,28 @@
 // Account plumbing shared by the chat page and the sign-in screens.
-import { doc, getDoc } from "firebase/firestore";
+import { signInWithCustomToken } from "firebase/auth";
+import { deleteDoc, doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 export const profileDoc = (fb, uid) => doc(fb.db, "users", uid);
 export const call = (fb, name, data) => httpsCallable(fb.fns, name)(data).then((r) => r.data);
+
+// Active sessions (users/{uid}/sessions/{sid}). The id rides in the token's claims.
+// The server shows the time zone's city as the location ("America/Toronto" -> "Toronto").
+export const timeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } };
+export const sessionDoc = (fb, uid, sid) => doc(fb.db, "users", uid, "sessions", sid);
+export const currentSid = async (fb) => (await fb.auth.currentUser?.getIdTokenResult())?.claims.sid || null;
+// Calls a function that returns a fresh custom token (signOutOthers, changePassword, claimSession) and switches to it.
+export async function swapToken(fb, name, data = {}) {
+  const r = await call(fb, name, { ...data, tz: timeZone() });
+  if (r.token) await signInWithCustomToken(fb.auth, r.token);
+  return r;
+}
+// Removes this browser's row before signing out. Best effort: signing out must not wait on it.
+export async function endSession(fb) {
+  const u = fb.auth.currentUser;
+  const sid = await currentSid(fb).catch(() => null);
+  if (u && sid) await deleteDoc(sessionDoc(fb, u.uid, sid)).catch(() => {});
+}
 
 // Which step a signed-in (non-guest) account still needs, or null when it can chat.
 // Codes and the age check are enforced server-side (functions/auth.js, firestore.rules).

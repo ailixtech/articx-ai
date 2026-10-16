@@ -1,7 +1,7 @@
 {
   "name": "articx-ai-functions",
   "private": true,
-  "description": "ARTICxAI Cloud Functions",
+  "description": "ArticxAI Cloud Functions",
   "main": "index.js",
   "engines": {
     "node": "22"

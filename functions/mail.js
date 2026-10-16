@@ -7,7 +7,7 @@ const SMTP_HOST = defineString("SMTP_HOST", { default: "" });
 const SMTP_PORT = defineInt("SMTP_PORT", { default: 465 });
 const SMTP_USER = defineString("SMTP_USER", { default: "" });
 const SMTP_PASS = defineSecret("SMTP_PASS");
-const MAIL_FROM = defineString("MAIL_FROM", { default: "ARTICxAI <no-reply@articxai.com>" });
+const MAIL_FROM = defineString("MAIL_FROM", { default: "ArticxAI <no-reply@articxai.com>" });
 
 const mailReady = () => !!SMTP_HOST.value();
 function transport() {

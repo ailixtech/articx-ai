@@ -1,15 +1,17 @@
 rules_version = '2';
 
-// ARTICxAI: each signed-in user can only read and write their own chats.
-// Layout:  users/{uid}                                     { firstName, birthDate, country, createdAt }
+// ArticxAI: each signed-in user can only read and write their own chats.
+// Layout:  users/{uid}                                     { firstName, birthDate, country, createdAt, callName?, improveMaple?, improveMapleAt?, deactivatedAt?, purgeAfter? }
+//          training/{id}                                    { week, uidHash, model, lang, turns, reply, createdAt } (opted-in only; server only)
 //          users/{uid}/meta/avatar                         { photo, updatedAt } (profile picture)
+//          users/{uid}/sessions/{sid}                      { device, location, createdAt, updatedAt } (one per sign-in; created by Cloud Functions)
 //          users/{uid}/chats/{chatId}                      { title, createdAt, updatedAt, pinned?, shareId? }
 //          users/{uid}/chats/{chatId}/messages/{messageId} { role, content, createdAt, sources? }
 //          usage/{uid}_{YYYY-MM-DD}, _w{YYYY-MM-DD}, _m{YYYY-MM}  { count, limit } (read-only: day, week, month counts)
 //          interest/{uid}_{item}                            { uid, item, createdAt } ("Notify me" for a paid plan or add-on)
 //          shares/{shareId}                                 { uid, title, messages, createdAt } (written by the shareChat function)
 //          feedback/{id}                                    { uid, chatId, rating, reason, details, prompt, reply, createdAt }
-//          waitlist/{sha256(email)}                         { firstName, email, province, language, consent, consentAt, consentVersion, source, status, createdAt } (server only)
+//          waitlist/{sha256(email)}                         { firstName, email, organization, province, language, consent, consentAt, consentVersion, source, status, createdAt } (server only)
 //          stats/waitlist                                   { count, updatedAt } (public count on /waitlist; written by the countWaitlist function)
 //          billing/{uid}                                    { customerId, createdAt } (Stripe customer; server only)
 // Everything else (other usage/, otp/, throttle/, waitlist/ written by Cloud Functions) is denied to browsers.
@@ -27,11 +29,32 @@ service cloud.firestore {
       return t is string && t.size() > 0 && t.size() <= 120;
     }
 
-    // Profile { firstName, birthDate, country, createdAt }: written only by the
-    // completeProfile Cloud Function, readable by its owner.
+    // Profile { firstName, birthDate, country, createdAt }: written by the
+    // completeProfile Cloud Function, readable by its owner. The owner may only
+    // set callName (Settings > "What should Maple call you?"; empty clears it)
+    // and improveMaple (Settings > Privacy).
     match /users/{uid} {
       allow read: if isOwner(uid);
-      allow write: if false;
+      allow update: if verifiedOwner(uid) && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['callName'])
+          && request.resource.data.callName is string
+          && request.resource.data.callName.size() <= 40)
+        // Settings > Privacy > "Help improve Maple" (off by default), with the time of the choice.
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['improveMaple', 'improveMapleAt'])
+          && request.resource.data.improveMaple is bool
+          && request.resource.data.improveMapleAt == request.time));
+      allow create, delete: if false;
+    }
+
+    // Active sessions, created by verifyCode / resetFinish / signOutOthers / changePassword.
+    // A browser may bump its own session's updatedAt, and delete it when it signs out.
+    match /users/{uid}/sessions/{sid} {
+      allow read: if verifiedOwner(uid);
+      allow update: if verifiedOwner(uid) && request.auth.token.get('sid', '') == sid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if verifiedOwner(uid) && request.auth.token.get('sid', '') == sid;
+      allow create: if false;
     }
 
     // Profile picture { photo, updatedAt }: a small JPEG data URL (resized in the browser), owner only.

@@ -188,7 +188,7 @@ export function MessageList({ messages, notice, listRef, gate, ratings = {}, onR
     }
   });
   return (
-    <div ref={listRef} aria-live="polite" className="flex-1 overflow-y-auto overscroll-contain px-[.85rem] pt-4 pb-2 lg:px-4 lg:pt-6 lg:pb-4">
+    <div ref={listRef} aria-live="polite" className="chat-text flex-1 overflow-y-auto overscroll-contain px-[.85rem] pt-4 pb-2 lg:px-4 lg:pt-6 lg:pb-4">
       {items}
       {notice && <p role="alert" className="mx-auto mb-[1.6rem] max-w-[760px] rounded-[10px] border border-red px-[.9rem] py-[.65rem] text-[.87rem] text-ink">{notice}</p>}
       {gate}

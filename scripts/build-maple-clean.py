@@ -41,6 +41,24 @@ if os.path.exists("data/emails-qwen/review.csv"):
         if r.get("user2") and r.get("reply2"):
             examples.append({"src": "email-rewrite", "messages": base + [{"role": "user", "content": r["user2"]}, {"role": "assistant", "content": r["reply2"]}]})
 
+# Real chats from people who turned on "Help improve Maple" (scripts/export-training-week.sh), only rows you
+# marked keep=y in data/user-chats/review-*.csv (your corrections to the reply are used as written).
+import glob
+n_user = 0
+want_model = "maple-0.5-quick" if QUICK else "maple-0.5"
+for path in sorted(glob.glob("data/user-chats/review-*.csv")):
+    for r in csv.DictReader(open(path, encoding="utf-8-sig")):
+        if r.get("keep", "").strip().lower() not in ("y", "yes", "1", "x", "✓") or r.get("model") != want_model: continue
+        if not r.get("user") or bad(r.get("reply", "")): continue
+        msgs = [{"role": "system", "content": SYSTEM}]
+        for line in (r.get("context") or "").split("\n"):
+            m = re.match(r"^(USER|ASSISTANT): (.*)$", line)
+            if m: msgs.append({"role": m.group(1).lower(), "content": m.group(2)})
+            elif len(msgs) > 1: msgs[-1]["content"] += "\n" + line
+        msgs += [{"role": "user", "content": r["user"]}, {"role": "assistant", "content": r["reply"]}]
+        examples.append({"src": "user-chat", "messages": msgs}); n_user += 1
+if n_user: print(f"Real chats (reviewed): {n_user}")
+
 random.shuffle(examples)
 nv = max(20, round(len(examples) * 0.08))
 splits = {"valid": examples[:nv], "train": examples[nv:]}

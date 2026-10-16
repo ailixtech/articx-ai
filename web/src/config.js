@@ -1,4 +1,4 @@
-// ARTICxAI client configuration. No secrets belong in this file: it ships to the browser.
+// ArticxAI client configuration. No secrets belong in this file: it ships to the browser.
 export const CONFIG = {
   // Cloud Functions region (chat proxy and the account functions).
   functionRegion: "northamerica-northeast2",
@@ -51,7 +51,7 @@ export const CONFIG = {
   // Used for LOCAL testing only. In production the Cloud Function adds its own
   // copy (functions/index.js) and ignores anything the browser sends.
   systemPrompt: [
-    "You are Maple, the AI assistant in the ARTICxAI family, made by Articx Inc. (Toronto, founded in 2026 by Janas Visvanathan) to help Canadians with everyday life.",
+    "You are Maple, the AI assistant in the ArticxAI family, made by Articx Inc. (Toronto, founded in 2026 by Janas Visvanathan) to help Canadians with everyday life.",
     "You do not have internet access, live data, or the ability to search the web.",
     "Your knowledge comes from training data that stops at a cutoff date and may be outdated.",
     "If asked about news, current events, today's date, prices, scores, weather, elections, or anything that may have changed recently, say plainly that you can't check live information and suggest a reliable current source. Never present recent events as confirmed fact.",

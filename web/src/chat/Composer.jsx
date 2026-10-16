@@ -5,11 +5,13 @@ import PastedCard from "./PastedCard";
 import { CONFIG } from "../config";
 import { isLongPaste, joinPasted } from "../lib/pasted";
 import { useLang } from "../i18n";
+import { usePref } from "../lib/prefs";
 import useStarters from "./useStarters";
 
 const touch = () => matchMedia("(pointer: coarse)").matches;
 
 export default function Composer({ value, onChange, pastes, onPastes, onSubmit, onStop, streaming, empty, isGuest, guestLeft, inputRef, model, onModel, onSignUp }) {
+  const [enterSends] = usePref("enterSends");
   const { s, lang } = useLang();
   const t = s.chat;
   const starters = useStarters(lang, t.starters);
@@ -53,7 +55,8 @@ export default function Composer({ value, onChange, pastes, onPastes, onSubmit, 
         <textarea id="input" ref={inputRef} rows={1} placeholder={t.placeholder} autoComplete="off" enterKeyHint="send"
           value={value} onChange={(e) => onChange(e.target.value)} onPaste={onPaste}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !touch()) { e.preventDefault(); send(); }
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !touch()
+              && (enterSends === "1" || e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }
             if (e.key === "Backspace" && !value && pastes.length && e.currentTarget.selectionStart === 0) onPastes(pastes.slice(0, -1));
           }}
           className={`block max-h-[220px] w-full resize-none border-0 bg-transparent py-[.1rem] font-body leading-[1.55] text-ink outline-none placeholder:text-muted ${empty ? "min-h-12 text-[1.05rem]" : "text-base"}`} />

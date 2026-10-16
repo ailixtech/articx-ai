@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { createUserWithEmailAndPassword, signInWithCustomToken, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { call, describeAuthError } from "./account";
+import { call, describeAuthError, timeZone } from "./account";
 import { CloseIcon } from "../components/Icons";
 import { Brand, iconBtn } from "../components/ui";
 import { LangToggle, useLang } from "../i18n";
@@ -170,7 +170,7 @@ export default function AuthScreen({ fb, account, view, setView, pending }) {
     });
     if (step === "code") return run(async () => {
       if (code.length !== 6) return say(A.messages.enterCode);
-      const { token } = await call(fb, "verifyCode", { code });
+      const { token } = await call(fb, "verifyCode", { code, tz: timeZone() });
       await signInWithCustomToken(fb.auth, token);
       await account.refresh();
     });
@@ -194,7 +194,7 @@ export default function AuthScreen({ fb, account, view, setView, pending }) {
     if (step === "reset-code") return run(async () => {
       if (code.length !== 6) return say(A.messages.enterCode);
       if (newPassword.length < 8) return say(A.errors.weakPassword);
-      const { token } = await call(fb, "resetFinish", { email: resetEmail, code, password: newPassword });
+      const { token } = await call(fb, "resetFinish", { email: resetEmail, code, password: newPassword, tz: timeZone() });
       await signInWithCustomToken(fb.auth, token);
       await account.refresh();
     });

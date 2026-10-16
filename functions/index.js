@@ -1,5 +1,5 @@
 /**
- * ARTICxAI chat proxy (Cloud Functions 2nd gen, Toronto).
+ * ArticxAI chat proxy (Cloud Functions 2nd gen, Toronto).
  *
  * Browser -> this function (verifies Firebase ID token, checks daily quota,
  * adds the system prompt) -> your OpenAI-compatible model server -> streams back.
@@ -18,6 +18,7 @@ initializeApp();
 
 // Email codes, profile and password reset (callable functions).
 Object.assign(exports, require("./auth"));
+Object.assign(exports, require("./account"));
 // Public share links for chats.
 Object.assign(exports, require("./share"));
 // Payment methods and invoices (Stripe).
@@ -30,6 +31,9 @@ Object.assign(exports, require("./waitlist"));
 // Weekly topic counts for the homepage (no message text is stored).
 const { countTopic, topics, weekOf } = require("./topics");
 const { detectLanguage, noticeFor, promptFor, countLanguage } = require("./language");
+const training = require("./training");
+exports.trainingOptOut = training.trainingOptOut;
+exports.exportTraining = training.exportTraining;
 exports.topics = topics;
 exports.starters = require("./starters").starters;
 
@@ -187,11 +191,15 @@ exports.chat = onRequest(
       return res.status(401).json({ error: "Your session expired. Sign in again." });
     }
     if (!guest && !verified) return res.status(401).json({ error: "Enter the code we emailed you to finish signing in." });
+    let callName = "", improveMaple = false;
     if (!guest) {
       const profile = await getFirestore().doc(`users/${uid}`).get();
       if (!profile.get("birthDate") || profile.get("ineligible")) {
         return res.status(403).json({ error: "Finish setting up your account to chat." });
       }
+      // Settings > Account > "What should Maple call you?"
+      improveMaple = profile.get("improveMaple") === true; // Settings > Privacy > Help improve Maple (off by default)
+      callName = String(profile.get("callName") || "").replace(/[^\p{L}\p{M}\p{N} .'-]/gu, "").trim().slice(0, 40);
     }
 
     // 2. Is the request reasonable?
@@ -248,7 +256,8 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (lastUser) countLanguage(lang, weekOf(new Date()));
     const core = search ? SEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
     const styled = model.style ? `${core} ${model.style}` : core;
-    const basePrompt = lang ? `${styled}\n\n${promptFor(lang)}` : styled;
+    const named = callName ? `${styled}\n\nThe user likes to be called ${callName}. Use the name now and then, where it feels natural.` : styled;
+    const basePrompt = lang ? `${named}\n\n${promptFor(lang)}` : named;
     const systemPrompt = emergency
       ? `${basePrompt}\n\n${EMERGENCY_PROMPT[emergency]}`
       : search ? `${basePrompt}\n\n${search.prompt}` : basePrompt;
@@ -285,7 +294,7 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
       // and hold back [DONE] so search links can be sent first as {"sources": [...]}.
       // The app shows those as real links, separate from the model's text.
       const decoder = new TextDecoder();
-      let buf = "", chars = 0, finish = null, firstBytes = "";
+      let buf = "", chars = 0, finish = null, firstBytes = "", replyText = "";
       const forward = (line) => {
         const t = line.trim();
         if (t === "data: [DONE]") return;
@@ -293,7 +302,9 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
         if (t.startsWith("data:")) {
           try {
             const j = JSON.parse(t.slice(5));
-            chars += (j.choices?.[0]?.delta?.content || "").length;
+            const piece = j.choices?.[0]?.delta?.content || "";
+            chars += piece.length;
+            if (improveMaple && replyText.length < 20000) replyText += piece;
             finish = j.choices?.[0]?.finish_reason || finish;
           } catch { /* not JSON */ }
         }
@@ -325,6 +336,11 @@ const lastUser = [...messages].reverse().find((m) => m.role === "user");
         res.write(`data: ${JSON.stringify({ sources, searched: true })}\n\n`);
       }
       res.write("data: [DONE]\n\n");
+      // Help improve Maple: opted-in accounts only; never emergencies or answers built from live search.
+      // Saved before res.end() because Cloud Functions may pause work after the response is closed.
+      if (improveMaple && !guest && !emergency && !search && finish !== "length") {
+        await training.saveExchange({ uid, week: weekOf(new Date()), model: requested, lang: lang?.code, messages, reply: replyText });
+      }
       res.end();
     } catch (e) {
       if (e.name === "AbortError") return; // user pressed Stop or closed the tab

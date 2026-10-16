@@ -12,8 +12,9 @@ import { store } from "../lib/storage";
 import { plainText, splitPasted } from "../lib/pasted";
 import { useTheme } from "../lib/useTheme";
 import { ModelError, friendlyError, streamCompletion } from "../lib/model";
-import { authText } from "./account";
+import { authText, endSession } from "./account";
 import { useAccount } from "./useAccount";
+import { useSession } from "./useSession";
 import { Boot } from "./Boot";
 import AuthScreen from "./AuthScreen";
 import Sidebar from "./Sidebar";
@@ -93,6 +94,7 @@ export default function ChatPage() {
   const account = useAccount();
   const { fb, phase, user } = account;
   const uid = user?.uid ?? null;
+  const sid = useSession(fb, uid);
   const navigate = useNavigate();
   const location = useLocation();
   const { chatId: routeId } = useParams();
@@ -282,7 +284,7 @@ export default function ChatPage() {
     rememberAccount(u, photo);
     stopStreaming();
     loggedOut.current = true;
-    signOut(fb.auth);
+    endSession(fb).finally(() => signOut(fb.auth));
   }
 
   // Runs when the account switches between guest and signed in (not on every auth event).
@@ -691,7 +693,7 @@ export default function ChatPage() {
           onSignOut={() => { setMenuOpen(false); setConfirmLogout(true); }} />
       )}
       {settingsOpen && uid && (
-        <Settings user={user} photo={photo} usage={usage} themePref={themePref} onTheme={setThemePref} model={model} onModel={chooseModel}
+        <Settings user={user} sid={sid} photo={photo} usage={usage} themePref={themePref} onTheme={setThemePref} model={model} onModel={chooseModel}
           backend={backend} onBackend={setBackend} onClose={() => setSettingsOpen(false)} fb={fb}
           onSignOut={() => { setSettingsOpen(false); setConfirmLogout(true); }} />
       )}

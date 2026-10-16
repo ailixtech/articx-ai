@@ -1,6 +1,6 @@
 /**
  * Billing through Stripe. Card details go straight from the browser to Stripe (Payment Element);
- * ARTICxAI only keeps the Stripe customer id, in billing/{uid} (server only, see firestore.rules).
+ * ArticxAI only keeps the Stripe customer id, in billing/{uid} (server only, see firestore.rules).
  *
  * billingSummary()                      -> { ready, publishableKey, methods, invoices }
  * billingSetupIntent()                  -> { clientSecret, publishableKey }   (to save a new payment method)

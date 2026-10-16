@@ -22,6 +22,7 @@ export function loadFirebase() {
         db: getFirestore(app),
         fns: getFunctions(app, CONFIG.functionRegion),
         projectId: config.projectId,
+        config, // for a second app instance (Settings > change password)
       };
     })
     .catch((e) => { ready = null; throw e; });

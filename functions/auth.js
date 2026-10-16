@@ -1,5 +1,5 @@
 /**
- * ARTICxAI account security: 6-digit email codes and the profile step.
+ * ArticxAI account security: 6-digit email codes and the profile step.
  *
  * Sign-up and sign-in: the browser signs in with email + password, then calls
  * sendCode. verifyCode checks the code and returns a custom token carrying
@@ -8,6 +8,10 @@
  *
  * Forgot password: resetStart emails a code, resetFinish checks it, sets the new
  * password and returns the same kind of token, so the person lands signed in.
+ *
+ * Sessions: each of those tokens also carries a session id { sid } for a row in
+ * users/{uid}/sessions (Settings > Account > Active sessions). signOutOthers and
+ * changePassword revoke every other sign-in and hand back a fresh token.
  *
  * Email goes out over SMTP (functions/.env + the SMTP_PASS secret). In the
  * emulator with no SMTP_HOST, codes are written to the function logs instead.
@@ -35,20 +39,20 @@ const fail = (code, reason, message) => new HttpsError(code, message, { reason }
 // Code emails in English and French; the app sends the visitor's language.
 const EMAILS = {
   en: {
-    signup: ["Confirm your email for ARTICxAI", "Welcome to ARTICxAI. Use this code to confirm your email address."],
-    login: ["Your ARTICxAI sign-in code", "Use this code to finish signing in to ARTICxAI."],
-    reset: ["Reset your ARTICxAI password", "Use this code to choose a new password for your ARTICxAI account."],
+    signup: ["Confirm your email for ArticxAI", "Welcome to ArticxAI. Use this code to confirm your email address."],
+    login: ["Your ArticxAI sign-in code", "Use this code to finish signing in to ArticxAI."],
+    reset: ["Reset your ArticxAI password", "Use this code to choose a new password for your ArticxAI account."],
     codeLabel: "Your code:",
     expiry: "It expires in 10 minutes. If you didn't ask for this, you can ignore this email.",
-    footer: "ARTICxAI, made in Canada by AILIX",
+    footer: "ArticxAI, made in Canada by AILIX",
   },
   fr: {
-    signup: ["Confirmez votre adresse courriel pour ARTICxAI", "Bienvenue sur ARTICxAI. Utilisez ce code pour confirmer votre adresse courriel."],
-    login: ["Votre code de connexion ARTICxAI", "Utilisez ce code pour terminer votre connexion à ARTICxAI."],
-    reset: ["Réinitialisez votre mot de passe ARTICxAI", "Utilisez ce code pour choisir un nouveau mot de passe pour votre compte ARTICxAI."],
+    signup: ["Confirmez votre adresse courriel pour ArticxAI", "Bienvenue sur ArticxAI. Utilisez ce code pour confirmer votre adresse courriel."],
+    login: ["Votre code de connexion ArticxAI", "Utilisez ce code pour terminer votre connexion à ArticxAI."],
+    reset: ["Réinitialisez votre mot de passe ArticxAI", "Utilisez ce code pour choisir un nouveau mot de passe pour votre compte ArticxAI."],
     codeLabel: "Votre code :",
     expiry: "Il expire dans 10 minutes. Si vous n'avez pas fait cette demande, vous pouvez ignorer ce courriel.",
-    footer: "ARTICxAI, conçu au Canada par AILIX",
+    footer: "ArticxAI, conçu au Canada par AILIX",
   },
 };
 const emailText = (lang, kind) => {
@@ -81,6 +85,54 @@ function clientIp(req) {
   return String(r.headers["x-forwarded-for"] || "").split(",")[0].trim() || r.ip || "unknown";
 }
 
+// ---------- Sessions ----------
+// "Chrome on macOS" from the user agent; good enough to tell your own devices apart.
+function deviceOf(ua) {
+  ua = String(ua || "");
+  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\/|Opera/.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
+    : /SamsungBrowser\//.test(ua) ? "Samsung Internet" : /Chrome\/|CriOS\//.test(ua) ? "Chrome"
+    : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+    : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /CrOS/.test(ua) ? "ChromeOS"
+    : /Linux/.test(ua) ? "Linux" : "";
+  return os ? `${browser} on ${os}` : browser;
+}
+// The browser's time zone ("America/Toronto" -> "Toronto"). We don't look up IP addresses.
+function placeOf(tz) {
+  tz = String(tz || "");
+  if (!/^[A-Za-z]+\/[A-Za-z_\-\/]{1,60}$/.test(tz)) return "";
+  return tz.split("/").pop().replace(/_/g, " ");
+}
+const sessionsCol = (uid) => db().collection(`users/${uid}/sessions`);
+
+// Records a sign-in and returns a custom token that carries its id.
+async function newSession(req, uid) {
+  const ref = sessionsCol(uid).doc();
+  const now = FieldValue.serverTimestamp();
+  await ref.set({
+    device: deviceOf(req.rawRequest.headers["user-agent"]),
+    location: placeOf(req.data?.tz),
+    createdAt: now,
+    updatedAt: now,
+  });
+  return getAuth().createCustomToken(uid, { otp: true, sid: ref.id });
+}
+// Signs the account out everywhere else and returns a fresh token for this browser,
+// keeping its session row (keepSid) when it has one.
+async function onlyThisSession(req, uid, keepSid) {
+  await getAuth().revokeRefreshTokens(uid);
+  const old = (await sessionsCol(uid).listDocuments()).filter((d) => d.id !== keepSid);
+  for (let i = 0; i < old.length; i += 400) {
+    const batch = db().batch();
+    old.slice(i, i + 400).forEach((d) => batch.delete(d));
+    await batch.commit();
+  }
+  const mine = keepSid ? sessionsCol(uid).doc(keepSid) : null;
+  if (!mine || !(await mine.get()).exists) return newSession(req, uid);
+  await mine.update({ updatedAt: FieldValue.serverTimestamp() });
+  return getAuth().createCustomToken(uid, { otp: true, sid: keepSid });
+}
+
 // ---------- Email ----------
 async function sendMail(to, mail, code) {
   const { subject, intro } = mail;
@@ -93,7 +145,7 @@ async function sendMail(to, mail, code) {
   }
   const text = `${intro}\n\n${mail.codeLabel} ${code}\n\n${mail.expiry}\n\n${mail.footer}`;
   const html = `<div lang="${mail.lang === "fr" ? "fr-CA" : "en-CA"}" style="font-family:Inter,Arial,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#102029">
-  <p style="font-size:18px;font-weight:700;margin:0 0 16px">ARTICxAI</p>
+  <p style="font-size:18px;font-weight:700;margin:0 0 16px">ArticxAI</p>
   <p style="margin:0 0 20px;line-height:1.5">${intro}</p>
   <p style="font-size:32px;font-weight:700;letter-spacing:8px;margin:0 0 20px">${code}</p>
   <p style="margin:0;color:#56687A;font-size:13px;line-height:1.5">${mail.expiry}</p>
@@ -189,7 +241,11 @@ exports.verifyCode = onCall(OPTS, async (req) => {
   await useCode(`otp/${a.uid}`, cleanCode(req.data?.code));
   const user = await getAuth().getUser(a.uid);
   if (!user.emailVerified) await getAuth().updateUser(a.uid, { emailVerified: true });
-  return { token: await getAuth().createCustomToken(a.uid, { otp: true }) };
+  // Signing in again restores an account that was deactivated (Settings > Delete account > Temporary).
+  const profile = db().doc(`users/${a.uid}`);
+  const restored = !!(await profile.get()).get("deactivatedAt");
+  if (restored) await profile.update({ deactivatedAt: FieldValue.delete(), purgeAfter: FieldValue.delete() });
+  return { token: await newSession(req, a.uid), restored };
 });
 
 // ---------- Profile ----------
@@ -252,6 +308,39 @@ exports.resetFinish = onCall(OPTS, async (req) => {
   await throttle(`reset-try:${clientIp(req)}`, 40);
   const { uid } = await useCode(resetDoc(email), code);
   await getAuth().updateUser(uid, { password, emailVerified: true });
-  await getAuth().revokeRefreshTokens(uid); // sign out everywhere else
-  return { token: await getAuth().createCustomToken(uid, { otp: true }) };
+  return { token: await onlyThisSession(req, uid) }; // sign out everywhere else
+});
+
+// ---------- Account settings ----------
+// Gives a session from before session tracking (no sid) its row and a token that carries it.
+exports.claimSession = onCall(OPTS, async (req) => {
+  const a = signedIn(req);
+  if (!isVerified(a.token)) throw fail("permission-denied", "verify_first", "Confirm your email first.");
+  if (a.token.sid) return { sid: a.token.sid };
+  return { token: await newSession(req, a.uid) };
+});
+
+exports.signOutOthers = onCall(OPTS, async (req) => {
+  const a = signedIn(req);
+  if (!isVerified(a.token)) throw fail("permission-denied", "verify_first", "Confirm your email first.");
+  await throttle(`sessions:${a.uid}`, 20);
+  return { token: await onlyThisSession(req, a.uid, a.token.sid) };
+});
+
+// proof: an ID token from signing in with the current password (in a separate app
+// instance, so this session keeps its code check). It must be this account and fresh.
+exports.changePassword = onCall(OPTS, async (req) => {
+  const a = signedIn(req);
+  if (!isVerified(a.token)) throw fail("permission-denied", "verify_first", "Confirm your email first.");
+  const password = String(req.data?.password || "");
+  if (password.length < 8 || password.length > 128) throw fail("invalid-argument", "weak_password", "Use a password with at least 8 characters.");
+  await throttle(`password:${a.uid}`, 10);
+  let proof;
+  try { proof = await getAuth().verifyIdToken(String(req.data?.proof || "")); } catch { proof = null; }
+  const fresh = proof && Date.now() / 1000 - proof.auth_time < 300;
+  if (!proof || proof.uid !== a.uid || proof.firebase?.sign_in_provider !== "password" || !fresh) {
+    throw fail("permission-denied", "wrong_password", "Your current password is incorrect.");
+  }
+  await getAuth().updateUser(a.uid, { password });
+  return { token: await onlyThisSession(req, a.uid, a.token.sid) };
 });

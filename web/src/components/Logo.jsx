@@ -1,4 +1,4 @@
-// ARTICxAI mark (same shape as the articx website's Logo.jsx). Fills with currentColor, so it
+// ArticxAI mark (same shape as the articx website's Logo.jsx). Fills with currentColor, so it
 // follows the text colour: white on the dark theme, dark on the light theme.
 export function LogoMark({ className = "h-7 w-auto" }) {
   return (
