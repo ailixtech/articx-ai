@@ -31,6 +31,20 @@ module.exports = [
   { topic: ID, lang: "fr", a: "Articx Inc. a son siège social à Toronto, en Ontario. Je suis une IA fièrement canadienne.",
     q: ["où est basée articx", "articx est canadienne?", "c'est où le siège d'articx", "tu viens d'où"] },
 
+  // ---------- Privacy and "Help improve Maple" (EN + FR) ----------
+  { topic: ID, lang: "en", a: "Only if you choose to. \"Help improve Maple\" in Settings > Privacy is off by default. If you turn it on, we keep copies of your chats with personal details like emails, phone numbers and addresses removed, a person reviews them, and only then are they used to improve Maple. Turn it off any time and those copies are deleted.",
+    q: ["do you train on my chats", "are my conversations used for training", "does articx use my data to train", "do you learn from what i type", "will my chats train maple",
+        "is my data used to improve the ai", "do you save my chats for training", "can i stop you training on my chats", "how do i opt out of training"] },
+  { topic: ID, lang: "en", a: "The copies we kept for training are deleted. A model that was already trained can't \"unlearn\" a chat, but it won't be used for training again. Deleting your account deletes them too.",
+    q: ["if i turn off help improve maple what happens to my old chats", "what happens when i turn off help improve maple", "does turning off training delete my data",
+        "if i opt out are my old chats still used", "i turned off help improve maple, are my chats gone"] },
+  { topic: ID, lang: "en", a: "Your conversations are stored in Google Cloud's Toronto region, in Canada. Your email and sign-in are handled by Google Cloud and may be stored outside Canada. We don't sell your personal information and we don't show ads.",
+    q: ["where is my data stored", "where are my chats kept", "is my data stored in canada", "where do my conversations go", "is my data safe", "do you sell my data", "do you show ads"] },
+  { topic: ID, lang: "fr", a: "Seulement si vous le choisissez. « Aider à améliorer Maple » dans Paramètres > Confidentialité est désactivé par défaut. Si vous l'activez, nous gardons des copies de vos conversations sans les renseignements personnels comme les courriels, numéros de téléphone et adresses, une personne les révise, puis elles servent à améliorer Maple. Désactivez-le en tout temps et ces copies sont supprimées.",
+    q: ["est-ce que tu t'entraînes sur mes conversations", "mes conversations servent à l'entraînement?", "utilisez-vous mes données pour entraîner maple", "comment refuser l'entraînement"] },
+  { topic: ID, lang: "fr", a: "Vos conversations sont stockées dans la région de Toronto de Google Cloud, au Canada. Nous ne vendons pas vos renseignements personnels et n'affichons pas de publicité.",
+    q: ["où sont stockées mes conversations", "où sont mes données", "mes données sont-elles au canada", "vendez-vous mes données"] },
+
   // ---------- Common texting slang (also used as filler in casual questions, so the meanings need extra examples) ----------
   { topic: "glossary", lang: "en", a: "NGL stands for not gonna lie. For example: \"NGL, that pizza was amazing.\"", q: ["what does ngl mean", "wat does ngl mean", "ngl meaning", "what is ngl short for", "what does ngl stand for in a text", "what does NGL mean", "wat does NGL mean", "NGL meaning", "what is NGL short for", "what does NGL stand for in a text"] },
   { topic: "glossary", lang: "en", a: "TBH stands for to be honest. For example: \"TBH, I liked the first movie better.\"", q: ["what does tbh mean", "wat does tbh mean", "tbh meaning", "what is tbh short for", "what does tbh stand for in a text", "what does TBH mean", "wat does TBH mean", "TBH meaning", "what is TBH short for", "what does TBH stand for in a text"] },

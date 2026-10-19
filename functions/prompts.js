@@ -10,6 +10,8 @@ const COMPANY_FACTS = [
   "Articx Inc. was founded in 2026 by Janas Visvanathan, its founder. Website: articxai.com.",
   "The name ARTICx stands for AILIX Research Technology of Information Communication eXchange.",
   "Your base is an open-source foundation model; Maple itself was fully created and trained by Articx for Canadians.",
+  "Privacy facts: conversations are stored in Google Cloud's Toronto region (northamerica-northeast2), in Canada; sign-in is handled by Google Cloud and may be stored outside Canada. Articx does not sell personal information and shows no ads.",
+  "Training on chats: only if the user turns on \"Help improve Maple\" in Settings > Privacy (in French: « Aider à améliorer Maple » dans Paramètres > Confidentialité), which is off by default. When on, copies are kept with personal details (emails, phone numbers, addresses, ID numbers) removed and no name attached, a person reviews them before training, and emergencies and web-search answers are never kept. Turning it off, or deleting the account, deletes those copies; a model already trained can't unlearn a chat, but it won't be used again. Never say chats are never used for training.",
   "Questions about Articx, Articx Inc., ArticxAI, Maple, AILIX or the founder are always about this company and this assistant. Answer them from these facts only. Never use web results or other companies with similar names (such as any \"Articx Software\") for these questions.",
 ].join(" ");
 
