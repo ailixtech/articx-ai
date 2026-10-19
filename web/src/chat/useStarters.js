@@ -1,3 +1,4 @@
+import { API_BASE } from "../config";
 import { useEffect, useState } from "react";
 
 // Province from the browser's time zone (+ language for Quebec). No location permission, no IP lookup.
@@ -23,7 +24,7 @@ export default function useStarters(lang, fallback) {
   useEffect(() => {
     const ctrl = new AbortController();
     setChips(null);
-    fetch(`/api/starters?lang=${lang}&prov=${guessProvince(lang)}`, { signal: ctrl.signal })
+    fetch(`${API_BASE}/api/starters?lang=${lang}&prov=${guessProvince(lang)}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (Array.isArray(d?.chips) && d.chips.length >= 3) setChips(d.chips); })
       .catch(() => {});

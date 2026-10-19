@@ -92,7 +92,7 @@ const en = {
       title: "Honest by design.",
       items: [
         ["Says when it doesn't know", "For news, prices or weather, Maple searches the web and shows its sources. When it can't confirm something, it tells you so and points you to a reliable source."],
-        ["No invented sources", "Links written by the model are shown as unverified text, never as clickable links, so a made-up URL can't mislead you."],
+        ["No invented sources", "Links to official sites like canada.ca are clickable. Any other link written by the model is shown as unverified text, so a made-up URL can't mislead you."],
         ["Canadian by default", "Canadian spelling, provinces, institutions and context, in English or French, without you having to ask."],
       ],
     },

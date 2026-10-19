@@ -53,7 +53,7 @@ def main():
     model, tok = load("mlx-community/Qwen2.5-7B-Instruct-4bit", adapter_path=None if adapter == "base" else path)
     rows, passed = [], 0
     for t in QA:
-        msgs = [{"role": "system", "content": system}, {"role": "user", "content": t["q"]}]
+        msgs = [{"role": "system", "content": system}] + t.get("history", []) + [{"role": "user", "content": t["q"]}]
         prompt = tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
         ans = generate(model, tok, prompt=prompt, max_tokens=250 if model_id == "maple-0.5-quick" else 450).strip()
         ok, why = grade(t, ans)

@@ -1,6 +1,6 @@
 // Safe Markdown: the model's text becomes React elements, never HTML strings,
-// so nothing it writes can run as code. Links are shown as plain "unverified"
-// text, because the model can invent URLs.
+// so nothing it writes can run as code. Links to trusted official sites (TRUSTED) are clickable;
+// all others are shown as plain "unverified" text, because the model can invent URLs.
 import { useState } from "react";
 import { useLang } from "../i18n";
 
@@ -70,6 +70,25 @@ function Blocks({ text, t }) {
   return out;
 }
 
+// Official sites the model may link to directly. Anything else stays "unverified" text,
+// because a made-up or look-alike domain could mislead or phish. Links are always opened over https.
+const TRUSTED = [
+  "canada.ca", "gc.ca", "elections.ca", "ontario.ca", "quebec.ca", "gouv.qc.ca", "gov.bc.ca", "alberta.ca", "gov.mb.ca",
+  "saskatchewan.ca", "novascotia.ca", "gov.ns.ca", "gnb.ca", "gov.nl.ca", "princeedwardisland.ca", "gov.pe.ca", "yukon.ca",
+  "gov.nt.ca", "gov.nu.ca", "toronto.ca", "montreal.ca", "ottawa.ca", "vancouver.ca", "calgary.ca", "edmonton.ca", "winnipeg.ca",
+  "988.ca", "cybertip.ca", "redcross.ca", "articx.com", "wikipedia.org",
+];
+function trustedUrl(raw) {
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = u.hostname.toLowerCase();
+    if (u.username || u.password || u.port) return null;
+    if (!TRUSTED.some((d) => host === d || host.endsWith(`.${d}`))) return null;
+    u.protocol = "https:";
+    return u.href;
+  } catch { return null; }
+}
+
 const LINK = /\[([^\]]+)\]\(((?:https?:\/\/|www\.)[^\s)]+)\)|((?:https?:\/\/|www\.)[^\s<>()]*[^\s<>().,;:!?'"])/g;
 
 // `code`, links, then **bold** / *italic* inside the remaining text.
@@ -82,7 +101,10 @@ function inline(s, k, t) {
     for (const m of part.matchAll(LINK)) {
       if (m.index > last) nodes.push(...emphasis(part.slice(last, m.index), `${key}-t${m.index}`));
       const url = m[2] || m[3];
-      const span = <span key={`${key}-u${m.index}`} className="unverified-link" title={t.unverifiedTitle} data-note={t.unverifiedNote}>{url}</span>;
+      const safe = trustedUrl(url);
+      const span = safe
+        ? <a key={`${key}-u${m.index}`} href={safe} target="_blank" rel="noopener noreferrer nofollow">{url.replace(/^https?:\/\//i, "").replace(/\/$/, "")}</a>
+        : <span key={`${key}-u${m.index}`} className="unverified-link" title={t.unverifiedTitle} data-note={t.unverifiedNote}>{url}</span>;
       nodes.push(...(m[1] ? [...emphasis(m[1], `${key}-l${m.index}`), " (", span, ")"] : [span]));
       last = m.index + m[0].length;
     }

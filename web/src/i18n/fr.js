@@ -92,7 +92,7 @@ const fr = {
       title: "Honnête par conception.",
       items: [
         ["Il dit quand il ne sait pas", "Pour l'actualité, les prix ou la météo, Maple fait une recherche sur le Web et affiche ses sources. Quand il ne peut pas confirmer une information, il vous le dit et vous oriente vers une source fiable."],
-        ["Aucune source inventée", "Les liens écrits par le modèle s'affichent comme du texte non vérifié, jamais comme des liens cliquables, pour qu'une adresse inventée ne puisse pas vous induire en erreur."],
+        ["Aucune source inventée", "Les liens vers des sites officiels comme canada.ca sont cliquables. Tout autre lien écrit par le modèle s'affiche comme du texte non vérifié, pour qu'une adresse inventée ne puisse pas vous induire en erreur."],
         ["Canadien par défaut", "L'orthographe, les provinces, les institutions et le contexte canadiens, en français ou en anglais, sans que vous ayez à le demander."],
       ],
     },

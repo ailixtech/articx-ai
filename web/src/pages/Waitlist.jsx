@@ -1,4 +1,5 @@
 import "@fontsource/open-sans/800.css"; // logo and headline; 400–700 load in main.jsx
+import { API_BASE } from "../config";
 import { useEffect, useId, useRef, useState } from "react";
 import { usePageTitle } from "../components/SiteLayout";
 import { CheckIcon, LEAF_PATH, LEAF_VIEWBOX, LockIcon } from "../components/Icons";
@@ -127,7 +128,7 @@ function JoinForm({ w, lang, onJoined }) {
     setStatus("sending");
     setFormError(null);
     try {
-      const r = await fetch("/api/waitlist", {
+      const r = await fetch(`${API_BASE}/api/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, language: lang }),
@@ -341,23 +342,19 @@ function useNightChrome() {
   }, []);
 }
 
-// stats/waitlist.count (kept by the countWaitlist function), read through the Firestore REST
-// API so this page doesn't load the Firebase SDK. Refreshes while the tab is visible.
+// stats/waitlist.count (kept by the countWaitlist function), from GET /api/waitlist so it also works
+// on articx.com, which is hosted outside Firebase. Refreshes while the tab is visible.
 // null until it loads, or if it can't be read; the page then just hides the counter.
 function useWaitlistCount() {
   const [count, setCount] = useState(null);
   const load = useRef(null);
   useEffect(() => {
     let alive = true;
-    const url = fetch("/__/firebase/init.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((c) => `https://firestore.googleapis.com/v1/projects/${c.projectId}/databases/(default)/documents/stats/waitlist?key=${c.apiKey}`);
-    load.current = () => url
-      .then((u) => fetch(u, { cache: "no-store" }))
+    load.current = () => fetch(`${API_BASE}/api/waitlist`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        const n = Number(d?.fields?.count?.integerValue);
-        if (alive && Number.isFinite(n)) setCount(n);
+        const n = Number(d?.count);
+        if (alive && Number.isFinite(n) && n > 0) setCount(n);
       })
       .catch(() => {});
     load.current();

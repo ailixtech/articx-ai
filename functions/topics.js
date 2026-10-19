@@ -8,6 +8,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { cors } = require("./cors");
 
 // Order breaks ties. "learning" is a catch-all and only wins when nothing else matches.
 // Keep the ids in step with home.useCases.items in web/src/i18n.
@@ -60,6 +61,7 @@ async function countTopic(text) {
 const topics = onRequest(
   { region: "northamerica-northeast2", memory: "256MiB", maxInstances: 3, invoker: "public" },
   async (req, res) => {
+    if (cors(req, res, "GET, OPTIONS")) return;
     if (req.method !== "GET") return res.status(405).json({ error: "Use GET." });
     const now = new Date();
     const last = new Date(now.getTime() - 7 * 864e5);

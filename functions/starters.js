@@ -12,6 +12,7 @@ const logger = require("firebase-functions/logger");
 const { getFirestore } = require("firebase-admin/firestore");
 const { TAVILY_API_KEY, tavilySearch } = require("./search");
 const { weekOf } = require("./topics");
+const { cors } = require("./cors");
 
 const PROV = { // en name · French "in …" form · French name · main city
   ON: ["Ontario", "en Ontario", "Ontario", "Toronto"], QC: ["Quebec", "au Québec", "Québec", "Montréal"],
@@ -102,6 +103,7 @@ async function popular(prov, lang, now) {
 const starters = onRequest(
   { region: "northamerica-northeast2", memory: "256MiB", maxInstances: 5, invoker: "public", secrets: [TAVILY_API_KEY] },
   async (req, res) => {
+    if (cors(req, res, "GET, OPTIONS")) return;
     if (req.method !== "GET") return res.status(405).json({ error: "Use GET." });
     const lang = req.query.lang === "fr" ? "fr" : "en";
     const prov = PROV[String(req.query.prov || "").toUpperCase()] ? String(req.query.prov).toUpperCase() : "CA";

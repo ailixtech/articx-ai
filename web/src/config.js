@@ -61,4 +61,8 @@ export const CONFIG = {
   ].join(" "),
 };
 
+// Where the site's small API calls go (/api/waitlist, /api/topics, /api/starters). On Firebase Hosting they're
+// same-origin rewrites (""). The company site on articx.com is hosted at WHC, so it calls prod Firebase instead.
+export const API_BASE = /(^|\.)articx\.com$/i.test(location.hostname) ? "https://articx-ai.web.app" : "";
+
 export const IS_LOCAL = import.meta.env.DEV && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);

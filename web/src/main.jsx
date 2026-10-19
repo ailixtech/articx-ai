@@ -19,6 +19,11 @@ applyTextSize();
 const ChatPage = lazy(() => import("./chat/ChatPage"));
 const SharePage = lazy(() => import("./chat/SharePage"));
 
+// Phase 1 (Oct 2026): articx.com is the company site + waitlist only. Chat opens on articxai.com in November,
+// so on articx.com (and the prod Firebase address) the chat and share links go to the waitlist.
+const CHAT_CLOSED = /(^|\.)articx\.com$|^articx-ai\.(web\.app|firebaseapp\.com)$/i.test(window.location.hostname);
+const waitlist = <Navigate to="/waitlist" replace />;
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <LangProvider>
@@ -27,8 +32,8 @@ createRoot(document.getElementById("root")).render(
         {/* Until launch, the home page is the waitlist (firebase.json redirects "/" too). */}
         <Route path="/" element={<Navigate to="/waitlist" replace />} />
         <Route path="/waitlist" element={<Waitlist />} />
-        <Route path="/chat/:chatId?" element={<Suspense fallback={<Boot />}><ChatPage /></Suspense>} />
-        <Route path="/share/:shareId" element={<Suspense fallback={<Boot />}><SharePage /></Suspense>} />
+        <Route path="/chat/:chatId?" element={CHAT_CLOSED ? waitlist : <Suspense fallback={<Boot />}><ChatPage /></Suspense>} />
+        <Route path="/share/:shareId" element={CHAT_CLOSED ? waitlist : <Suspense fallback={<Boot />}><SharePage /></Suspense>} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="*" element={<NotFound />} />

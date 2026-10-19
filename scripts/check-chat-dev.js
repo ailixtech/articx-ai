@@ -36,9 +36,10 @@ function grade(t, answer, searched) {
   return why;
 }
 
-async function ask(model, q) {
+async function ask(model, q, history = []) {
   const emergency = emergencyKind(q);
-  const search = emergency ? null : await getSearchContext(q, "");
+  const prevUser = [...history].reverse().find((m) => m.role === "user")?.content || "";
+  const search = emergency ? null : await getSearchContext(q, prevUser);
   const lang = detectLanguage(q);
   const core = search ? SEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
   let sys = `${core} ${STYLES[model]}`;
@@ -46,7 +47,7 @@ async function ask(model, q) {
   sys = emergency ? `${sys}\n\n${EMERGENCY_PROMPT[emergency]}` : search ? `${sys}\n\n${search.prompt}` : sys;
   const r = await fetch(URL, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, stream: false, temperature: 0.7, max_tokens: MAX[model], messages: [{ role: "system", content: sys }, { role: "user", content: q }] }),
+    body: JSON.stringify({ model, stream: false, temperature: 0.7, max_tokens: MAX[model], messages: [{ role: "system", content: sys }, ...history, { role: "user", content: q }] }),
   });
   if (!r.ok) throw new Error(`model server ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const j = await r.json();
@@ -61,7 +62,7 @@ async function ask(model, q) {
     const rows = [];
     for (const t of QA) {
       let res;
-      try { res = await ask(model, t.q); } catch (e) { res = { text: `ERROR ${e.message}`, searched: false }; }
+      try { res = await ask(model, t.q, t.history || []); } catch (e) { res = { text: `ERROR ${e.message}`, searched: false }; }
       const why = res.text.startsWith("ERROR") ? [res.text] : grade(t, res.text, res.searched);
       console.log(`${why.length ? "FAIL" : "PASS"}  ${t.id.padEnd(10)} ${res.searched ? "[web] " : ""}${t.q}${why.length ? "   <- " + why.join("; ") : ""}`);
       rows.push({ t, ...res, why });

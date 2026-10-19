@@ -1,5 +1,7 @@
 /**
- * Waitlist sign-ups from /waitlist (POST /api/waitlist, a Hosting rewrite, so same origin).
+ * Waitlist sign-ups from /waitlist (POST /api/waitlist, a Hosting rewrite). The company site on articx.com
+ * (hosted at WHC) calls it cross-origin through https://articx-ai.web.app/api/waitlist (functions/cors.js).
+ * GET /api/waitlist returns { count } for the page's counter (stats/waitlist), cached for 30 seconds.
  *
  * One document per email address: waitlist/{sha256(lowercased email)} with { firstName, email,
  * organization, province, language, consent, consentAt, consentVersion, source, status, createdAt }.
@@ -13,35 +15,24 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { createHash } = require("node:crypto");
+const { cors } = require("./cors");
+const { EMAIL_RE, PROVINCES, clientIp, sha, str, underLimit } = require("./shared");
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PER_IP_HOUR = 10;
-// Keep in step with PROVINCES in web/src/pages/Waitlist.jsx and waitlist.provinces in web/src/i18n.
-const PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT", "outside"];
-// Bump when the consent sentence in web/src/i18n (waitlist.form.consent) changes.
+// PROVINCES (shared.js) must match apps/articx/src/pages/Waitlist.jsx.
+// Bump when the consent sentence in apps/articx/src/i18n/waitlist.js (form.consent) changes.
 const CONSENT_VERSION = "2026-10-04";
 const SOURCE = "waitlist-v2";
-
-const sha = (s) => createHash("sha256").update(s).digest("hex");
-const clientIp = (req) => (req.get("x-forwarded-for") || "").split(",")[0].trim() || req.ip || "unknown";
-const str = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
-
-// One counter per IP (hashed, never stored in clear) per hour; false once over the limit.
-async function underLimit(ip) {
-  const db = getFirestore();
-  const ref = db.doc(`throttle/waitlist_${sha(ip).slice(0, 32)}_${new Date().toISOString().slice(0, 13)}`);
-  return db.runTransaction(async (tx) => {
-    const n = (await tx.get(ref)).get("count") || 0;
-    if (n >= MAX_PER_IP_HOUR) return false;
-    tx.set(ref, { count: n + 1, updatedAt: new Date() }, { merge: true });
-    return true;
-  });
-}
 
 exports.waitlist = onRequest(
   { region: "northamerica-northeast2", memory: "256MiB", maxInstances: 3, invoker: "public" },
   async (req, res) => {
+    if (cors(req, res)) return;
+    if (req.method === "GET") {
+      const snap = await getFirestore().doc("stats/waitlist").get().catch(() => null);
+      res.set("Cache-Control", "public, max-age=30, s-maxage=30");
+      return res.json({ count: Number(snap?.get("count")) || 0 });
+    }
     res.set("Cache-Control", "no-store");
     if (req.method !== "POST") return res.status(405).json({ error: "method" });
 
@@ -59,7 +50,7 @@ exports.waitlist = onRequest(
     if (b.consent !== true) return res.status(400).json({ error: "consent" });
 
     try {
-      if (!(await underLimit(clientIp(req)))) return res.status(429).json({ error: "throttled" });
+      if (!(await underLimit("waitlist", clientIp(req), MAX_PER_IP_HOUR))) return res.status(429).json({ error: "throttled" });
       const db = getFirestore();
       const ref = db.doc(`waitlist/${sha(email)}`);
       await db.runTransaction(async (tx) => {

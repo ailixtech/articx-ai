@@ -27,6 +27,16 @@ Object.assign(exports, require("./billing"));
 Object.assign(exports, require("./feedback"));
 // Waitlist sign-ups from /waitlist.
 Object.assign(exports, require("./waitlist"));
+// Thank-you email to each new sign-up, and unsubscribe (POST /api/unsubscribe).
+Object.assign(exports, require("./waitlistEmail"));
+// Company-site forms on articx.com (careers, AI Platform early access, product updates, contact, feedback),
+// and an email to support@ for each new submission.
+Object.assign(exports, require("./careers"));
+Object.assign(exports, require("./platform"));
+Object.assign(exports, require("./updates"));
+Object.assign(exports, require("./contact"));
+Object.assign(exports, require("./siteFeedback"));
+Object.assign(exports, require("./notify"));
 
 // Weekly topic counts for the homepage (no message text is stored).
 const { countTopic, topics, weekOf } = require("./topics");
@@ -43,6 +53,8 @@ const MODEL_API_KEY = defineSecret("MODEL_API_KEY"); // bearer token your model 
 
 // Plain config (functions/.env)
 const MODEL_NAME = defineString("MODEL_NAME");
+// "false" on prod until chat launches on articxai.com (November 2026); the waitlist works without it.
+const CHAT_ENABLED = defineString("CHAT_ENABLED", { default: "true" });
 // Name of the fine-tuned Maple 0.5 Quick model on your model server (empty = use MODEL_NAME).
 const MODEL_NAME_QUICK = defineString("MODEL_NAME_QUICK", { default: "" });
 // Optional separate server for Maple 0.5 Quick (e.g. mlx_lm.server on a Mac via a tunnel, no key).
@@ -176,6 +188,7 @@ exports.chat = onRequest(
     if (req.method === "OPTIONS") return res.status(okOrigin ? 204 : 403).end();
     if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
     if (!okOrigin) return res.status(403).json({ error: "Origin not allowed." });
+    if (CHAT_ENABLED.value() === "false") return res.status(503).json({ error: "Maple opens in November. Join the waitlist at articx.com/waitlist." });
 
     // 1. Who is this?
     const match = (req.get("authorization") || "").match(/^Bearer (.+)$/);

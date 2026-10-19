@@ -1970,6 +1970,116 @@
     ]
    ],
    "must_not": []
+  },
+  {
+   "id": "turn-1",
+   "cat": "multiturn",
+   "lang": "en",
+   "q": "your answer outcome pattern is same qwen open model and like that",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does the canadian immigration point system work"
+    },
+    {
+     "role": "assistant",
+     "content": "Canada's Express Entry uses the Comprehensive Ranking System (CRS), which scores age, education, language and work experience out of 1,200. I can't confirm exact point values, so use the official CRS calculator on canada.ca."
+    }
+   ],
+   "expected": "Thanks for the feedback! My base is an open-source foundation model that Articx fine-tunes and keeps improving for Canadians. Use the thumbs down on answers that feel generic so we can fix them.",
+   "must": [
+    [
+     "thank",
+     "feedback",
+     "appreciate"
+    ]
+   ],
+   "must_not": [
+    "points breakdown",
+    "bachelor",
+    "400 points",
+    "master's degree"
+   ]
+  },
+  {
+   "id": "turn-2",
+   "cat": "multiturn",
+   "lang": "en",
+   "q": "what's the capital of nova scotia",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does the canadian immigration point system work"
+    },
+    {
+     "role": "assistant",
+     "content": "Canada's Express Entry uses the Comprehensive Ranking System (CRS), which scores age, education, language and work experience out of 1,200. I can't confirm exact point values, so use the official CRS calculator on canada.ca."
+    }
+   ],
+   "expected": "Halifax.",
+   "must": [
+    [
+     "halifax"
+    ]
+   ],
+   "must_not": [
+    "crs",
+    "express entry"
+   ]
+  },
+  {
+   "id": "turn-3",
+   "cat": "multiturn",
+   "lang": "en",
+   "q": "what about for quebec?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does the canadian immigration point system work"
+    },
+    {
+     "role": "assistant",
+     "content": "Canada's Express Entry uses the Comprehensive Ranking System (CRS), which scores age, education, language and work experience out of 1,200. I can't confirm exact point values, so use the official CRS calculator on canada.ca."
+    }
+   ],
+   "expected": "Quebec runs its own selection system (through the Arrima portal / Quebec skilled worker programs), separate from federal Express Entry; check quebec.ca.",
+   "must": [
+    [
+     "quebec",
+     "québec"
+    ]
+   ],
+   "must_not": [
+    "400 points",
+    "bachelor's degree: "
+   ]
+  },
+  {
+   "id": "turn-4",
+   "cat": "multiturn",
+   "lang": "en",
+   "q": "that's too long, shorter please",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does the canadian immigration point system work"
+    },
+    {
+     "role": "assistant",
+     "content": "Canada's Express Entry uses the Comprehensive Ranking System (CRS), which scores age, education, language and work experience out of 1,200. I can't confirm exact point values, so use the official CRS calculator on canada.ca."
+    }
+   ],
+   "expected": "Express Entry ranks you with CRS points (out of 1,200) for age, education, language and work. Check exact points with the CRS calculator on canada.ca.",
+   "must": [
+    [
+     "crs",
+     "express entry",
+     "calculator"
+    ]
+   ],
+   "must_not": [
+    "400 points"
+   ]
   }
  ]
 }
