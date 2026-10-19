@@ -10,9 +10,9 @@ const en = {
     columns: [
       { title: "Product", links: [["Try Maple", "/chat"], ["Join the waitlist", "/waitlist"], ["Models", "/#models"], ["Use cases", "/#use-cases"], ["FAQ", "/#faq"]] },
       { title: "Trust", links: [["Where your data lives", "/#privacy"], ["Privacy policy", "/privacy"], ["Terms of use", "/terms"]] },
-      { title: "Company", links: [["About AILIX", "/#about"], ["Contact", "mailto:articxai@gmail.com"]] },
+      { title: "Company", links: [["About Articx", "/#about"], ["Contact", "mailto:support@articx.com"]] },
     ],
-    rights: (y) => `© ${y} AILIX. All rights reserved.`,
+    rights: (y) => `© ${y} Articx. All rights reserved.`,
     built: "Designed and built in Canada",
   },
 
@@ -91,7 +91,7 @@ const en = {
       eyebrow: "Principles",
       title: "Honest by design.",
       items: [
-        ["Says when it doesn't know", "Maple can't browse the web yet. Ask about news or prices and it tells you so, then points you to a reliable source."],
+        ["Says when it doesn't know", "For news, prices or weather, Maple searches the web and shows its sources. When it can't confirm something, it tells you so and points you to a reliable source."],
         ["No invented sources", "Links written by the model are shown as unverified text, never as clickable links, so a made-up URL can't mislead you."],
         ["Canadian by default", "Canadian spelling, provinces, institutions and context, in English or French, without you having to ask."],
       ],
@@ -112,9 +112,9 @@ const en = {
       ],
     },
     about: {
-      eyebrow: "Built by AILIX",
+      eyebrow: "Built by Articx",
       title: "An AI assistant that answers to Canadians.",
-      text: "AILIX is a Canadian company. We design, build and run Maple here, and we're building it in the open with the people who use it.",
+      text: "Articx is a Canadian company based in Toronto. We design, build and run Maple here, and we're building it in the open with the people who use it.",
       cta1: "Start chatting free",
       cta2: "Create an account",
     },
@@ -165,7 +165,7 @@ const en = {
         ["Where it's stored", "In Google Cloud's Toronto region, in Canada."],
         ["Who sees it", "Only the ARTICX team. We never sell your details or share them with advertisers."],
         ["How long we keep it", "Until you unsubscribe or ask us to delete it, or until the waitlist closes after launch."],
-        ["Your choices", "Unsubscribe with the link in any of our emails, or write to articxai@gmail.com to see, correct or delete your details. You can also contact the Office of the Privacy Commissioner of Canada."],
+        ["Your choices", "Unsubscribe with the link in any of our emails, or write to support@articx.com to see, correct or delete your details. You can also contact the Office of the Privacy Commissioner of Canada."],
       ],
       updated: "Last updated: October 2026",
       close: "Close",
@@ -239,7 +239,7 @@ const en = {
       cancel: "Cancel", submit: "Send feedback", sending: "Sending…", failed: "Your feedback couldn't be sent. Try again.",
       // The thank-you screen, chosen by the reason picked ("" = none picked).
       thanks: {
-        bug: ["Thanks for reporting this bug", "We've passed the details to our engineers, and they'll look into it. If it keeps happening, try refreshing the page, or email us at articxai@gmail.com."],
+        bug: ["Thanks for reporting this bug", "We've passed the details to our engineers, and they'll look into it. If it keeps happening, try refreshing the page, or email us at support@articx.com."],
         inaccurate: ["Thanks for catching that", "Getting facts right matters most to us. We'll review this reply and use it to help Maple be more accurate."],
         unhelpful: ["Thanks for telling us", "We'll look at how Maple could have given you a more useful answer."],
         context: ["Thanks for keeping Maple local", "We'll review how Maple handles Canadian and provincial details like these."],
@@ -300,7 +300,7 @@ const en = {
       home: "ArticxAI homepage", privacy: "Privacy policy", signOut: "Sign out",
       toLight: "Switch to light theme", toDark: "Switch to dark theme", modelServer: "Model server",
       signIn: "Sign in", signUp: "Sign up",
-      history: "History", support: "Support", settings: "Settings", supportEmail: "articxai@gmail.com",
+      history: "History", support: "Support", settings: "Settings", supportEmail: "support@articx.com",
     },
     logout: { title: "Are you sure you want to log out?", confirm: "Log out", cancel: "Cancel" },
     theme: { label: "Theme", light: "Light", dark: "Dark", system: "System" },

@@ -95,7 +95,7 @@ export default {
           "Permanent: your account, chats, profile picture, sessions and shared links are deleted right away. This can't be undone.",
         ],
       },
-      "You can also email our Privacy Officer at articxai@gmail.com to ask us to delete your account.",
+      "You can also email our Privacy Officer at support@articx.com to ask us to delete your account.",
 
       { h: "How we protect it" },
       "We protect your information with safeguards suited to its sensitivity. Data is encrypted in transit. Every sign-in needs both your password and a code sent to your email. Access to our systems is limited to people and services that need it. You can see your active sessions in Settings and sign out other devices at any time.",
@@ -112,7 +112,7 @@ export default {
         ],
       },
       "Quebec residents also have rights under Law 25, including the right to have their information transferred to them in a commonly used technological format, and to be told about decisions made exclusively by automated processing.",
-      "To make a request, email articxai@gmail.com. We'll answer within the time the law allows (usually 30 days). We may ask you to confirm your identity first.",
+      "To make a request, email support@articx.com. We'll answer within the time the law allows (usually 30 days). We may ask you to confirm your identity first.",
       "If you're not satisfied with our answer, you can complain to the Office of the Privacy Commissioner of Canada (priv.gc.ca). Quebec residents can also contact the Commission d'accès à l'information du Québec (cai.gouv.qc.ca).",
 
       { h: "Children" },
@@ -124,7 +124,7 @@ export default {
       { h: "Contact us" },
       "Privacy Officer, Articx Inc.",
       "Toronto, Ontario, Canada",
-      "Email: articxai@gmail.com",
+      "Email: support@articx.com",
       ["See also our ", { link: "/terms", text: "Terms of use" }, "."],
     ],
   },
@@ -208,7 +208,7 @@ export default {
 
       { h: "16. Contact us" },
       "Articx Inc., Toronto, Ontario, Canada",
-      "Email: articxai@gmail.com",
+      "Email: support@articx.com",
     ],
   },
 };

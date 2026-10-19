@@ -1,3 +1,4 @@
+import { API_BASE } from "../config";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { SiteFooter, SiteHeader, usePageTitle } from "../components/SiteLayout";
@@ -126,7 +127,7 @@ export default function Home() {
             <div>
               <p className={eyebrow}>{h.faq.eyebrow}</p>
               <h2 className={h2}>{h.faq.title}</h2>
-              <p className={lead}>{h.faq.lead} <a href="mailto:articxai@gmail.com">{h.faq.contact}</a>.</p>
+              <p className={lead}>{h.faq.lead} <a href="mailto:support@articx.com">{h.faq.contact}</a>.</p>
             </div>
             <div className="faq divide-y divide-line border-y border-line">
               {h.faq.items.map(([q, a]) => (
@@ -256,7 +257,7 @@ function useRankedTopics() {
   const [ranked, setRanked] = useState([]);
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch("/api/topics", { signal: ctrl.signal })
+    fetch(`${API_BASE}/api/topics`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.live && Array.isArray(d.ranked)) setRanked(d.ranked); })
       .catch(() => {});

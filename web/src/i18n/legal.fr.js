@@ -95,7 +95,7 @@ export default {
           "Définitive : votre compte, vos conversations, votre photo de profil, vos sessions et vos liens partagés sont supprimés immédiatement. Cette action est irréversible.",
         ],
       },
-      "Vous pouvez aussi écrire à notre responsable de la protection des renseignements personnels à articxai@gmail.com pour demander la suppression de votre compte.",
+      "Vous pouvez aussi écrire à notre responsable de la protection des renseignements personnels à support@articx.com pour demander la suppression de votre compte.",
 
       { h: "Comment nous les protégeons" },
       "Nous protégeons vos renseignements avec des mesures adaptées à leur sensibilité. Les données sont chiffrées en transit. Chaque connexion exige votre mot de passe et un code envoyé à votre adresse courriel. L'accès à nos systèmes est limité aux personnes et aux services qui en ont besoin. Vous pouvez voir vos sessions actives dans les Paramètres et déconnecter vos autres appareils en tout temps.",
@@ -112,7 +112,7 @@ export default {
         ],
       },
       "Les résidents du Québec ont aussi des droits en vertu de la Loi 25, dont le droit de recevoir leurs renseignements dans un format technologique structuré et couramment utilisé, et celui d'être informés des décisions fondées exclusivement sur un traitement automatisé.",
-      "Pour faire une demande, écrivez à articxai@gmail.com. Nous répondrons dans le délai prévu par la loi (habituellement 30 jours). Nous pourrions d'abord vous demander de confirmer votre identité.",
+      "Pour faire une demande, écrivez à support@articx.com. Nous répondrons dans le délai prévu par la loi (habituellement 30 jours). Nous pourrions d'abord vous demander de confirmer votre identité.",
       "Si notre réponse ne vous satisfait pas, vous pouvez porter plainte auprès du Commissariat à la protection de la vie privée du Canada (priv.gc.ca). Les résidents du Québec peuvent aussi s'adresser à la Commission d'accès à l'information du Québec (cai.gouv.qc.ca).",
 
       { h: "Enfants" },
@@ -124,7 +124,7 @@ export default {
       { h: "Nous joindre" },
       "Responsable de la protection des renseignements personnels, Articx Inc.",
       "Toronto (Ontario), Canada",
-      "Courriel : articxai@gmail.com",
+      "Courriel : support@articx.com",
       ["Voir aussi nos ", { link: "/terms", text: "Conditions d'utilisation" }, "."],
     ],
   },
@@ -208,7 +208,7 @@ export default {
 
       { h: "16. Nous joindre" },
       "Articx Inc., Toronto (Ontario), Canada",
-      "Courriel : articxai@gmail.com",
+      "Courriel : support@articx.com",
     ],
   },
 };

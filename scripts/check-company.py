@@ -10,6 +10,10 @@ import json, os, shutil, subprocess, sys, tempfile, unicodedata, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QA = json.load(open(os.path.join(ROOT, "data/eval/company-qa.json")))["tests"]
+if "--only" in sys.argv:
+    _cats = sys.argv[sys.argv.index("--only") + 1].split(",")
+    QA = [t for t in QA if t["cat"] in _cats]
+    del sys.argv[sys.argv.index("--only"):sys.argv.index("--only") + 2]
 
 def norm(s):
     s = unicodedata.normalize("NFKD", s.lower().replace("’", "'"))
@@ -57,6 +61,9 @@ def main():
         print(f"{'PASS' if ok else 'FAIL'}  {t['id']:<10} {t['q']}" + ("" if ok else f"   <- {'; '.join(why)}"))
         rows.append((t, ans, ok, why))
     score = f"{passed}/{len(QA)}"
+    by = {}
+    for t, _, ok, _ in rows: by.setdefault(t["cat"], [0, 0]); by[t["cat"]][0] += ok; by[t["cat"]][1] += 1
+    print("\n" + "  ".join(f"{c} {a}/{b}" for c, (a, b) in by.items()))
     print(f"\n{label}: {score} passed")
     day = datetime.date.today().isoformat()
     out = os.path.join(ROOT, f"docs/sessions/company-check-{label}-{day}.md")

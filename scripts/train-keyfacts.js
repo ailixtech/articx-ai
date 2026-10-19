@@ -45,6 +45,23 @@ module.exports = [
   { topic: ID, lang: "fr", a: "Vos conversations sont stockées dans la région de Toronto de Google Cloud, au Canada. Nous ne vendons pas vos renseignements personnels et n'affichons pas de publicité.",
     q: ["où sont stockées mes conversations", "où sont mes données", "mes données sont-elles au canada", "vendez-vous mes données"] },
 
+  // ---------- App facts and "don't invent" (EN + FR) ----------
+  { topic: ID, lang: "en", a: "Not yet. ArticxAI works in the web browser on any phone, tablet or computer, so there's nothing to download. Just open it in Safari or Chrome.",
+    q: ["is there a maple app for iphone", "is there an articx app", "can i download maple on android", "is maple on the app store", "where do i download articxai", "do you have a mobile app"] },
+  { topic: ID, lang: "en", a: "ArticxAI is a Canadian AI chat app made by Articx Inc. in Toronto. Its assistant is Maple, built to help Canadians with everyday life, in English or French.",
+    q: ["what is articxai", "what's articxai", "explain articxai", "what does articxai do", "is articxai an app or a company"] },
+  { topic: ID, lang: "fr", a: "ArticxAI est une application d'IA canadienne créée par Articx Inc. à Toronto. Son assistant s'appelle Maple et il aide les Canadiens au quotidien, en français ou en anglais.",
+    q: ["c'est quoi articxai", "qu'est-ce qu'articxai", "articxai c'est une appli?"] },
+  { topic: ID, lang: "en", a: "I can't confirm the latest election results without live information. For official results, check Elections Canada at elections.ca or a trusted news source.",
+    q: ["who won the last federal election", "who won the election", "who is the prime minister of canada right now", "who is the current premier of ontario", "which party won the last election", "who is the mayor of toronto now"] },
+  { topic: ID, lang: "en", a: "Choose Sign out all other devices in Settings > Account, then change your password.",
+    q: ["i see a device i dont recognize in my sessions", "someone else is logged into my account", "unknown device in active sessions", "how do i sign out other devices"] },
+
+  { topic: ID, lang: "fr", a: "Seulement si vous activez « Aider à améliorer Maple » dans Paramètres > Confidentialité. C'est désactivé par défaut. Vos conversations sont stockées à Toronto, pas sur votre appareil, et si vous désactivez l'option, les copies conservées sont supprimées.",
+    q: ["est-ce que mes conversations servent à t'entraîner?", "tu apprends de mes messages?", "est-ce que tu gardes mes conversations pour t'entraîner", "mes données servent à entraîner l'ia?"] },
+  { topic: ID, lang: "en", a: "Tap the thumbs down under that answer and tell us what was wrong. A person on our team reads it, and it helps us improve Maple. For anything important, check an official source.",
+    q: ["maple gave me a wrong answer what do i do", "how do i report a wrong answer", "the answer was wrong", "how do i give feedback on an answer", "maple made a mistake"] },
+
   // ---------- Common texting slang (also used as filler in casual questions, so the meanings need extra examples) ----------
   { topic: "glossary", lang: "en", a: "NGL stands for not gonna lie. For example: \"NGL, that pizza was amazing.\"", q: ["what does ngl mean", "wat does ngl mean", "ngl meaning", "what is ngl short for", "what does ngl stand for in a text", "what does NGL mean", "wat does NGL mean", "NGL meaning", "what is NGL short for", "what does NGL stand for in a text"] },
   { topic: "glossary", lang: "en", a: "TBH stands for to be honest. For example: \"TBH, I liked the first movie better.\"", q: ["what does tbh mean", "wat does tbh mean", "tbh meaning", "what is tbh short for", "what does tbh stand for in a text", "what does TBH mean", "wat does TBH mean", "TBH meaning", "what is TBH short for", "what does TBH stand for in a text"] },
