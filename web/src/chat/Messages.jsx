@@ -18,7 +18,7 @@ export function UserBubble({ content }) {
           {pastes.map((p, i) => <PastedCard key={i} text={p} />)}
         </div>
       )}
-      {text && <div className="max-w-[80%] whitespace-pre-wrap rounded-[20px_20px_6px_20px] bg-lake-soft px-[1.05rem] py-[.7rem] text-ink [overflow-wrap:anywhere]">{text}</div>}
+      {text && <div className="max-w-[80%] whitespace-pre-wrap rounded-[20px_20px_6px_20px] bg-bubble px-[1.05rem] py-[.7rem] text-ink [overflow-wrap:anywhere]">{text}</div>}
     </div>
   );
 }
@@ -86,7 +86,7 @@ export function UserMessage({ content, at, latest, canEdit, onEdit }) {
           {pastes.map((p, i) => <PastedCard key={i} text={p} />)}
         </div>
       )}
-      {text && <div className="max-w-[80%] whitespace-pre-wrap rounded-[20px_20px_6px_20px] bg-lake-soft px-[1.05rem] py-[.7rem] text-ink [overflow-wrap:anywhere]">{text}</div>}
+      {text && <div className="max-w-[80%] whitespace-pre-wrap rounded-[20px_20px_6px_20px] bg-bubble px-[1.05rem] py-[.7rem] text-ink [overflow-wrap:anywhere]">{text}</div>}
       <div className={`-mt-1 -mr-1 flex items-center gap-[2px] transition-opacity focus-within:opacity-100 ${latest ? "opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"}`}>
         {at && <span className="mr-1 text-[.78rem] text-muted tabular-nums">{timeLabel(at, s.locale)}</span>}
         <button type="button" className={action(false)} title={done ? t.copied : t.copy} aria-label={done ? t.copied : t.copy} onClick={copy}>
@@ -163,6 +163,9 @@ export function AssistantMessage({ content, streaming, langNote, rating, onRate,
         ) : (
           <div className={`prose-reply ${streaming ? "typing" : ""}`}><Markdown text={content} /></div>
         )}
+        {!streaming && content.includes("```") && (
+          <p className="m-0 mt-[.5rem] text-[.78rem] text-muted">{s.chat.codeNote}</p>
+        )}
         {!streaming && content && <ReplyActions text={content} rating={rating} onRate={onRate} onDislike={onDislike} onToast={onToast} onShare={onShare} />}
       </div>
     </div>
@@ -177,7 +180,7 @@ export function MessageList({ messages, notice, listRef, gate, ratings = {}, onR
   messages.forEach((m, i) => {
     if (m.role === "user") {
       items.push(<UserMessage key={i} content={m.content} at={m.at} latest={i === lastUser} canEdit={!busy}
-        onEdit={onEdit && ((next) => onEdit(i, next))} />);
+        onEdit={onEdit && i === lastUser ? (next) => onEdit(i, next) : undefined} />);
     }
     else {
       items.push(

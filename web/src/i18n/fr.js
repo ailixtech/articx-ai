@@ -219,6 +219,7 @@ const fr = {
       privacy: "Politique de confidentialité",
     },
     thinking: "Réflexion",
+    codeNote: "Nous améliorons Maple en programmation pour vous donner les meilleurs résultats. Vérifiez le code avant de l'utiliser.",
     copyReply: "Copier la réponse",
     paste: {
       label: "Collé", title: "Texte collé", view: "Voir le texte collé", edit: "Modifier le texte collé", remove: "Retirer le texte collé",

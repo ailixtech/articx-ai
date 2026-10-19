@@ -34,15 +34,32 @@ const ACCIDENT = [
   /accident de (voiture|la route|auto)|j ai eu un accident|je viens d avoir un accident|collision/,
 ];
 
+// Requests to make dangerous things (typos included): force a kind refusal plus safe alternatives.
+const DANGER_THING = "(danger|dangu|dangr|deadly|lethal|toxic|toxin|poison|explosive|explosiv|bomb|nerve agent|nerve gas|chemical weapon|bio ?weapon|mustard gas|chlorine gas|ricin|sarin|anthrax|napalm|thermite|meth|fentanyl|pipe bomb|molotov|ghost gun|malware|ransomware|keylogger)";
+const MAKE = "(create|creat|make|mak|build|produce|synthes|cook|brew|mix|manufactur|recipe|formula|ingredients for|how to make|how do i make|how can i make|steps to make|fabriquer|créer|creer|faire)";
+const HARMFUL = [
+  new RegExp(`${MAKE}.{0,40}${DANGER_THING}`),
+  new RegExp(`${DANGER_THING}\\w*.{0,25}(recipe|formula|ingredients|instructions|step by step|at home)`),
+  /(poison|kill|hurt) (someone|somebody|my|a person|people|him|her)/,
+];
+
 function emergencyKind(text) {
   const t = norm(text);
   if (CRISIS.some((r) => r.test(t))) return "crisis";
   if (MEDICAL.some((r) => r.test(t)) || MEDICAL_FR.some((r) => r.test(t))) return "medical";
   if (ACCIDENT.some((r) => r.test(t))) return "accident";
+  if (HARMFUL.some((r) => r.test(t))) return "harmful";
   return null;
 }
 
 const EMERGENCY_PROMPT = {
+  harmful: [
+    "SAFETY: the user is asking how to make or use something dangerous (dangerous chemicals, poison, explosives, weapons, illegal drugs or malware), possibly with typos.",
+    "Do NOT give any instructions, ingredients, quantities, recipes, code, or a web page about making it, and do not reinterpret it as a different task (for example building a website).",
+    "In one or two kind, non-preachy sentences, say you can't help with making that because it could seriously hurt people.",
+    "Then offer 2 or 3 safe alternatives: general chemical safety and why some household products must never be mixed (without amounts or steps), how to store or dispose of chemicals safely, or a safe science experiment.",
+    "If someone may already be exposed or in danger, say to call 911 or the provincial poison centre. Reply in the user's language.",
+  ].join(" "),
   medical: [
     "EMERGENCY: the user may be describing a medical emergency (for example a sudden or severe headache, chest pain, trouble breathing, stroke signs, fainting, a seizure, heavy bleeding, an overdose or a severe allergic reaction).",
     "Your FIRST line must be, in bold: tell them to call 911 now (or go to the nearest emergency department), and to not drive themselves.",

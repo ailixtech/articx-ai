@@ -13,6 +13,7 @@
   --lake: #009DC4;      /* brand blue: fills, borders, accents */
   --lake-deep: #00708E; /* same hue, dark enough for text (AA on bg and surface) */
   --lake-soft: #DDF1F7;
+  --bubble: #BEE3EF;    /* your messages in chat: a clearer blue than lake-soft */
   --lake-ink: #FFFFFF;
   --red: #C8102E;
   --focus: #009DC4;
@@ -22,14 +23,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0C161D; --bg-2: #111F28; --surface: #15242E; --ink: #E5EDF1; --muted: #93A7B3; --muted-strong: #93A7B3;
-    --line: #253B48; --lake: #009DC4; --lake-deep: #4CC6E4; --lake-soft: #0E3341; --lake-ink: #FFFFFF; --red: #F2566B; --focus: #4CC6E4;
+    --line: #253B48; --lake: #009DC4; --lake-deep: #4CC6E4; --lake-soft: #0E3341; --bubble: #17485B; --lake-ink: #FFFFFF; --red: #F2566B; --focus: #4CC6E4;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.7);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0C161D; --bg-2: #111F28; --surface: #15242E; --ink: #E5EDF1; --muted: #93A7B3; --muted-strong: #93A7B3;
-  --line: #253B48; --lake: #009DC4; --lake-deep: #4CC6E4; --lake-soft: #0E3341; --lake-ink: #FFFFFF; --red: #F2566B; --focus: #4CC6E4;
+  --line: #253B48; --lake: #009DC4; --lake-deep: #4CC6E4; --lake-soft: #0E3341; --bubble: #17485B; --lake-ink: #FFFFFF; --red: #F2566B; --focus: #4CC6E4;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.7);
   color-scheme: dark;
 }
@@ -45,6 +46,7 @@
   --color-lake: var(--lake);
   --color-lake-deep: var(--lake-deep);
   --color-lake-soft: var(--lake-soft);
+  --color-bubble: var(--bubble);
   --color-lake-ink: var(--lake-ink);
   --color-red: var(--red);
   --color-focus: var(--focus);

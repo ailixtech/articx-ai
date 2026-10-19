@@ -217,6 +217,7 @@ const en = {
       privacy: "Privacy Policy",
     },
     thinking: "Thinking",
+    codeNote: "We're improving Maple's coding to give you the best results. Check code before you use it.",
     copyReply: "Copy reply",
     paste: {
       label: "Pasted", title: "Pasted text", view: "View pasted text", edit: "Edit pasted text", remove: "Remove pasted text",
